@@ -1,0 +1,25 @@
+{
+  "name": "@panosoft/slate-replicator",
+  "version": "0.1.0",
+  "description": "",
+  "repository": "panosoft/slate-replicator",
+  "dependencies": {
+    "@panosoft/slate-db-utils": "^0.1.2",
+    "bunyan": "^1.8.0",
+    "co": "^4.6.0",
+    "co-read": "^0.1.1",
+    "commander": "^2.9.0",
+    "is_js": "^0.8.0",
+    "ramda": "^0.19.1"
+  },
+  "devDependencies": {
+    "faker": "^3.0.1",
+    "node-uuid": "^1.4.7"
+  },
+  "scripts": {
+    "patch": "npm version patch && git push --follow-tags && npm publish",
+    "minor": "npm version minor && git push --follow-tags && npm publish"
+  },
+  "author": "",
+  "license": "ISC"
+}
