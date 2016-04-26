@@ -1,5 +1,5 @@
 # slate-replicator
-> A Postgresql Event Source Table Replicator.
+Postgresql Event Source Table Replicator
 
 The purpose of the slate-replicator is to copy a table of immutable events from a Postgresql Event Source database to an events table in one or more Destination databases.
 
@@ -81,12 +81,12 @@ The replicator copies in a transactional manner so it can be stopped at any time
 #### eventSource
   > Parameters used to connect to the Event Source database
 
-  | Field         | Required?| Description                
-  | ------------- |:--------:| ---------------------------------------
-  | host          | Yes      | database server name
-  | databaseName  | Yes      | database name containing the events table         
-  | user          | No       | database user name.  connection attempt will fail if missing and required by database.                            |
-  | password      | No       | database user password.  connection attempt will fail if missing and required by database.                          |
+| Field         | Required | Description                
+| ------------- |:--------:| :---------------------------------------
+| host          | Yes      | database server name
+| databaseName  | Yes      | database name containing the events table         
+| user          | No       | database user name.  connection attempt will fail if missing and required by database.
+| password      | No       | database user password.  connection attempt will fail if missing and required by database.
 
 #### replicationDestinations
 > An array of one or more objects containing parameters identical to `eventSource` parameters.  These parameters are used to connect to `replicationDestination` databases which must contain a table called `events`.  The `replicationDestination` databases are where the events from the `eventSource` database `events` table are copied.
