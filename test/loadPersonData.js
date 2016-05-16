@@ -117,6 +117,7 @@ var numberPersonEventsToCreateBeforeDelete = Math.ceil(numberOfInserts / numberP
 numberPersonEventsToCreateBeforeDelete = numberPersonEventsToCreateBeforeDelete >= 1 ? numberPersonEventsToCreateBeforeDelete : 1;
 // uniqueIds
 const initiatorIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
+const entityIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
 
 // number of filler events to create per insert statement
 var fillerEventsPerStatement = Math.ceil(numberOfFillerEvents / numberOfInserts);
@@ -161,6 +162,10 @@ function getRandomInitiatorId() {
 	return initiatorIdList[getRandomInt(0, initiatorIdList.length)];
 }
 
+function getRandomEntityId() {
+	return entityIdList[getRandomInt(0, initiatorIdList.length)];
+}
+
 // return personId to delete from list of personIds created
 var getPersonToDelete = function(currentPersonCount) {
 	var personIdList = Object.keys(personIds);
@@ -181,34 +186,42 @@ var createPersonEvents = function(countPersonCreated) {
 		name: 'PersonCreated',
 		initiatorId: getRandomInitiatorId(),
 		data: {
-			personId: personId
+			id: personId
 		}
 	};
 	events[events.length] = {
 		name: 'PersonNameAdded',
-		initiatorId: getRandomInitiatorId(),
 		data: {
-			personId: personId,
+			id: personId,
 			lastName: faker.name.lastName(),
 			firstName: faker.name.firstName(),
 			mi: ''
+		},
+		metadata: {
+			initiatorId: getRandomInitiatorId(),
+			command: 'Add person name'
 		}
 	};
 	events[events.length] = {
 		name: 'PersonSSNAdded',
-		initiatorId: getRandomInitiatorId(),
 		data: {
-			personId: personId,
+			id: personId,
 			ssn : uuid.v4()
-		}
-	};
+		},
+		metadata: {
+			initiatorId: getRandomInitiatorId(),
+			command: 'Add person ssn'
+		}	};
 	if ((countPersonCreated + 1) % numberPersonEventsToCreateBeforeDelete === 0) {
 		
 		events[events.length] = {
 			name: 'PersonDeleted',
-			initiatorId: getRandomInitiatorId(),
 			data: {
-				personId: getPersonToDelete(countPersonCreated + 1)
+				id: getPersonToDelete(countPersonCreated + 1)
+			},
+			metadata: {
+				initiatorId: getRandomInitiatorId(),
+				command: 'Delete person'
 			}
 		};
 		countPersonDeleted++;
@@ -222,12 +235,15 @@ var createFillerEvents = function(countToCreate) {
 	for (var i = 0; i < countToCreate; i++) {
 		events[events.length] = {
 			name: 'FillerEvent' + getRandomInt(0, 9),
-			initiatorId: getRandomInitiatorId(),
 			data: {
-				guidId: uuid.v4,
+				id: uuid.v4(),
 				category: 'Category' + getRandomInt(0, 4),
 				a: getRandomInt(1, 2000),
 				b: getRandomInt(100, 200)
+			},
+			metadata: {
+				initiatorId: getRandomInitiatorId(),
+				command: 'Add filler event'
 			}
 		};
 	}
@@ -238,18 +254,23 @@ var createPersonEventValues = function(countPersonCreated) {
 	var eventValues = [];
 	var result = createPersonEvents(countPersonCreated);
 	result.events.forEach(function(event) {
-		eventValues[eventValues.length] = '(\'' + eventTimestamp.toISOString() + '\',\'' + JSON.stringify(event).replace(/'/g, '\'\'') + '\')';
+		// id[idx] represent the parameter value for the id column where idx is a 1-based index starting at 1
+		eventValues[eventValues.length] = `($1[${eventValues.length + 1}], '${eventTimestamp.toISOString()}', '${getRandomEntityId()}', ` +
+											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
 		eventTimestamp = new Date(eventTimestamp.valueOf() + (personEventDiffInMillisecs));
 	});
 	return {events: eventValues, countPersonDeleted: result.countPersonDeleted};
 };
 
-var createFillerEventValues = function() {
+var createFillerEventValues = function(idx) {
 	var eventValues = [];
 	createFillerEvents(fillerEventsPerStatement).forEach(function(event) {
-		eventValues[eventValues.length] = '(\'' + eventTimestamp.toISOString() + '\',\'' + JSON.stringify(event).replace(/'/g, '\'\'') + '\')';
+		// id[idx] represent the parameter value for the id column where idx is a 1-based
+		eventValues[eventValues.length] = `($1[${idx}], '${eventTimestamp.toISOString()}', '${getRandomEntityId()}', ` +
+											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
 		maxEventTimestamp = eventTimestamp;
 		eventTimestamp = new Date(eventTimestamp.valueOf() + (fillerEventDiffInMillisecs));
+		idx++;
 	});
 	return eventValues;
 };
@@ -265,7 +286,8 @@ const logDbStatus = co.wrap(function *(dbClient) {
 const createEvents = (totalPersonCreated) => {
 	var createPersonResult = createPersonEventValues(totalPersonCreated);
 	var personEvents = createPersonResult.events;
-	var fillerEvents = createFillerEventValues();
+	// pass the idx to be used for the first filler event which is 1 + the last idx used for the person events
+	var fillerEvents = createFillerEventValues(createPersonResult.events.length + 1);
 	return {events: personEvents.concat(fillerEvents), countPersonCreated: personEvents.length, countPersonDeleted: createPersonResult.countPersonDeleted, countFiller: fillerEvents.length};
 };
 
@@ -278,10 +300,16 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	var totalInsertStatementsCreated = 0;
 	while (totalInsertStatementsCreated < numberOfInserts) {
 		var createdEvents = createEvents(totalPersonCreated);
-		var insertStatement = 'INSERT INTO events (eventTimestamp, event) VALUES ' + createdEvents.events.join(', ') + ';';
+		var insertStatement = `SELECT insert_events($$${createdEvents.events.join(', ')}$$)`;
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
-		if (createdEvents.events.length !== result.rowCount) {
-			throw new Error('Program logic error  Event Count:', createdEvents.events.length, 'Rows Inserted:', result.rowCount);
+		if (result.rowCount === 1) {
+			var row1 = result.rows[0];
+			if (!(row1['insert_events'] && row1['insert_events'] === createdEvents.events.length)) {
+				throw new Error(`Program logic error.  Event count doesn't match rows inserted.  Event Count:  ${createdEvents.events.length}  Rows Inserted:  ${row1['insert_events']}`);
+			}
+		}
+		else {
+			throw new Error(`Program logic error.  Expected result array of one object to be returned.  Result:  ${result}`);
 		}
 		totalPersonEventsCreated += createdEvents.countPersonCreated;
 		totalFillerEventsCreated += createdEvents.countFiller;
