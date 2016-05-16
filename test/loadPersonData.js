@@ -1,15 +1,15 @@
 const co = require('co');
-var faker = require('faker');
-var uuid = require('node-uuid');
-var bunyan = require('bunyan');
-var program = require('commander');
-var R = require('ramda');
-var is = require('is_js');
-var path = require('path');
-var dbUtils = require('@panosoft/slate-db-utils');
-var utils = require('../lib/utils');
+const faker = require('faker');
+const uuid = require('node-uuid');
+const bunyan = require('bunyan');
+const program = require('commander');
+const R = require('ramda');
+const is = require('is_js');
+const path = require('path');
+const dbUtils = require('@panosoft/slate-db-utils');
+const utils = require('../lib/utils');
 
-var logger = bunyan.createLogger({
+const logger = bunyan.createLogger({
 	name: 'loadPersonData',
 	serializers: bunyan.stdSerializers
 });
@@ -31,7 +31,7 @@ process.on('SIGTERM', () => {
 	process.exit(0);
 });
 process.on('exit', function () {
-	var elapsed = Date.now() - startDate.getTime();
+	const elapsed = Date.now() - startDate.getTime();
 	logger.info('\n### Elapsed: ' + elapsed / 1000 + ' ###\n');
 });
 
@@ -46,7 +46,7 @@ program
 	.option('--dry-run', 'if specified, show run parameters and end without writing any events')
 	.parse(process.argv);
 
-var validateArguments = function(arguments) {
+const validateArguments = function(arguments) {
 	var errors = [];
 	if (!arguments.configFilename || is.not.string(arguments.configFilename))
 		errors = R.append('config-filename is invalid:  ' + arguments.configFilename, errors);
@@ -71,10 +71,10 @@ const logConfig = config => {
 		logger.info(`Database Connection Timeout (millisecs):`, config.connectTimeout);
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-var startDate = new Date();
+const startDate = new Date();
 logger.info('\n### ' + startDate + ' ###\n');
 
-var errors = validateArguments(program);
+const errors = validateArguments(program);
 if (errors.length > 0) {
 	logger.error('Invalid command line arguments:\n' + R.join('\n', errors));
 	program.help();
@@ -142,11 +142,11 @@ if (program.dryRun) {
 
 var personIds = {};
 // amount to increment eventTimestamp for every person row
-var personEventDiffInMillisecs = parseInt(program.personEventTimestampDiff, 10);
+const personEventDiffInMillisecs = parseInt(program.personEventTimestampDiff, 10);
 // amount to increment eventTimestamp for every filler row
-var fillerEventDiffInMillisecs = parseInt(program.fillerEventTimestampDiff, 10);
+const fillerEventDiffInMillisecs = parseInt(program.fillerEventTimestampDiff, 10);
 
-var logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted, maxEventTimestamp) {
+const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted, maxEventTimestamp) {
 	logger.info('Total Events Created:  ' + countEventsCreated + '  Persons Created:  ' + countPersonCreated +
 					'  Persons Deleted:  ' + countPersonDeleted +
 					'  Person Events Created:  ' + countPersonEventsCreated + '  Filler Events Created:  ' + countFillerEventsCreated +
@@ -167,9 +167,9 @@ function getRandomEntityId() {
 }
 
 // return personId to delete from list of personIds created
-var getPersonToDelete = function(currentPersonCount) {
-	var personIdList = Object.keys(personIds);
-	var personId = personIdList[getRandomInt(0, personIdList.length)];
+const getPersonToDelete = function(currentPersonCount) {
+	const personIdList = Object.keys(personIds);
+	const personId = personIdList[getRandomInt(0, personIdList.length)];
 	logger.info('Person Deletion Stats:  Current Person Count:  ' + currentPersonCount + '  personId Deleted:  ' + personId + '\n');
 	// remove personId to delete from list of personIds created
 	delete personIds[personId];
@@ -177,10 +177,10 @@ var getPersonToDelete = function(currentPersonCount) {
 };
 
 // create a set of person events
-var createPersonEvents = function(countPersonCreated) {
+const createPersonEvents = function(countPersonCreated) {
 	var events = [];
 	var countPersonDeleted = 0;
-	var personId = uuid.v4();
+	const personId = uuid.v4();
 	personIds[personId] = true;
 	events[events.length] = {
 		name: 'PersonCreated',
@@ -230,7 +230,7 @@ var createPersonEvents = function(countPersonCreated) {
 };
 
 // create a set of filler events
-var createFillerEvents = function(countToCreate) {
+const createFillerEvents = function(countToCreate) {
 	var events = [];
 	for (var i = 0; i < countToCreate; i++) {
 		events[events.length] = {
@@ -250,7 +250,7 @@ var createFillerEvents = function(countToCreate) {
 	return events;
 };
 
-var createPersonEventValues = function(countPersonCreated) {
+const createPersonEventValues = function(countPersonCreated) {
 	var eventValues = [];
 	var result = createPersonEvents(countPersonCreated);
 	result.events.forEach(function(event) {
@@ -262,7 +262,7 @@ var createPersonEventValues = function(countPersonCreated) {
 	return {events: eventValues, countPersonDeleted: result.countPersonDeleted};
 };
 
-var createFillerEventValues = function(idx) {
+const createFillerEventValues = function(idx) {
 	var eventValues = [];
 	createFillerEvents(fillerEventsPerStatement).forEach(function(event) {
 		// id[idx] represent the parameter value for the id column where idx is a 1-based
@@ -284,10 +284,10 @@ const logDbStatus = co.wrap(function *(dbClient) {
 });
 
 const createEvents = (totalPersonCreated) => {
-	var createPersonResult = createPersonEventValues(totalPersonCreated);
+	const createPersonResult = createPersonEventValues(totalPersonCreated);
 	var personEvents = createPersonResult.events;
 	// pass the idx to be used for the first filler event which is 1 + the last idx used for the person events
-	var fillerEvents = createFillerEventValues(createPersonResult.events.length + 1);
+	const fillerEvents = createFillerEventValues(createPersonResult.events.length + 1);
 	return {events: personEvents.concat(fillerEvents), countPersonCreated: personEvents.length, countPersonDeleted: createPersonResult.countPersonDeleted, countFiller: fillerEvents.length};
 };
 
