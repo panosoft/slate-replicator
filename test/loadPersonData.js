@@ -9,6 +9,8 @@ const path = require('path');
 const dbUtils = require('@panosoft/slate-db-utils');
 const utils = require('../lib/utils');
 
+const startDate = new Date();
+
 const logger = bunyan.createLogger({
 	name: 'loadPersonData',
 	serializers: bunyan.stdSerializers
@@ -71,8 +73,7 @@ const logConfig = config => {
 		logger.info(`Database Connection Timeout (millisecs):`, config.connectTimeout);
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-const startDate = new Date();
-logger.info('\n### ' + startDate + ' ###\n');
+logger.info('\n### ' + startDate.toISOString() + ' ###\n');
 
 const errors = validateArguments(program);
 if (errors.length > 0) {
@@ -146,6 +147,23 @@ const personEventDiffInMillisecs = parseInt(program.personEventTimestampDiff, 10
 // amount to increment eventTimestamp for every filler row
 const fillerEventDiffInMillisecs = parseInt(program.fillerEventTimestampDiff, 10);
 
+const testingStats = {
+	programId: uuid.v4(),
+	dbOperationNum: 0,
+	dbOperationId: uuid.v4(),
+	dbOperationEventCount: 0,
+	dbOperationTS: new Date().toISOString()
+};
+
+const updateTestingStats = (eventCount) => {
+	testingStats.dbOperationNum++;
+	testingStats.dbOperationId = uuid.v4();
+	testingStats.dbOperationEventCount = eventCount;
+	testingStats.dbOperationTS = new Date().toISOString();
+};
+
+const addTestingStatsToEvent = (event) => event.testingStats = testingStats;
+
 const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted, maxEventTimestamp) {
 	logger.info('Total Events Created:  ' + countEventsCreated + '  Persons Created:  ' + countPersonCreated +
 					'  Persons Deleted:  ' + countPersonDeleted +
@@ -154,17 +172,17 @@ const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, c
 };
 
 // return random integer between min (inclusive) and max (exclusive)
-function getRandomInt(min, max) {
+const getRandomInt = function(min, max) {
   return Math.floor(Math.random() * (max - min)) + min;
-}
+};
 
-function getRandomInitiatorId() {
+const getRandomInitiatorId = function() {
 	return initiatorIdList[getRandomInt(0, initiatorIdList.length)];
-}
+};
 
-function getRandomEntityId() {
+const getRandomEntityId = function() {
 	return entityIdList[getRandomInt(0, initiatorIdList.length)];
-}
+};
 
 // return personId to delete from list of personIds created
 const getPersonToDelete = function(currentPersonCount) {
@@ -184,9 +202,12 @@ const createPersonEvents = function(countPersonCreated) {
 	personIds[personId] = true;
 	events[events.length] = {
 		name: 'PersonCreated',
-		initiatorId: getRandomInitiatorId(),
 		data: {
 			id: personId
+		},
+		metadata: {
+			initiatorId: getRandomInitiatorId(),
+			command: 'Create person'
 		}
 	};
 	events[events.length] = {
@@ -211,7 +232,8 @@ const createPersonEvents = function(countPersonCreated) {
 		metadata: {
 			initiatorId: getRandomInitiatorId(),
 			command: 'Add person ssn'
-		}	};
+		}
+	};
 	if ((countPersonCreated + 1) % numberPersonEventsToCreateBeforeDelete === 0) {
 		
 		events[events.length] = {
@@ -253,7 +275,9 @@ const createFillerEvents = function(countToCreate) {
 const createPersonEventValues = function(countPersonCreated) {
 	var eventValues = [];
 	var result = createPersonEvents(countPersonCreated);
+	updateTestingStats(result.events.length + fillerEventsPerStatement);
 	result.events.forEach(function(event) {
+		addTestingStatsToEvent(event);
 		// id[idx] represent the parameter value for the id column where idx is a 1-based index starting at 1
 		eventValues[eventValues.length] = `($1[${eventValues.length + 1}], '${eventTimestamp.toISOString()}', '${getRandomEntityId()}', ` +
 											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
@@ -265,6 +289,7 @@ const createPersonEventValues = function(countPersonCreated) {
 const createFillerEventValues = function(idx) {
 	var eventValues = [];
 	createFillerEvents(fillerEventsPerStatement).forEach(function(event) {
+		addTestingStatsToEvent(event);
 		// id[idx] represent the parameter value for the id column where idx is a 1-based
 		eventValues[eventValues.length] = `($1[${idx}], '${eventTimestamp.toISOString()}', '${getRandomEntityId()}', ` +
 											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
