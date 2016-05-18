@@ -48,23 +48,27 @@ SELECT min(s.minid) AS minid, max(s.maxid) AS maxid, sum(s.count)::bigint AS cou
 --merge id and total events inserted stats from all rows.  validate event ids and total event inserted.
 --event ids must start at 1 and be consecutive integers.  total events inserted must equal total row count.
 merge_stats_from_all_rows AS (
-SELECT q.minid, q.maxid, q.count, e.eventcount
-FROM get_stats_from_all_rows AS q, get_eventcount_from_insert_groups AS e
-WHERE (q.minid = 1) IS NOT UNKNOWN
-	AND q.minid = 1
-	AND (q.ids = ARRAY(SELECT generate_series(q.minid, q.maxid))) IS NOT UNKNOWN
-	AND q.ids = ARRAY(SELECT generate_series(q.minid, q.maxid))
-	AND (q.count = array_length(ARRAY(SELECT generate_series(q.minid, q.maxid) ORDER BY 1), 1)) IS NOT UNKNOWN
-	AND q.count = array_length(ARRAY(SELECT generate_series(q.minid, q.maxid) ORDER BY 1), 1)
+SELECT a.minid, a.maxid, a.count, e.eventcount
+FROM get_stats_from_all_rows AS a, get_eventcount_from_insert_groups AS e
+WHERE (a.minid = 1) IS NOT UNKNOWN
+	AND a.minid = 1
+	AND (ARRAY(SELECT unnest(a.ids) ORDER BY 1) = ARRAY(SELECT generate_series(a.minid, a.maxid))) IS NOT UNKNOWN
+	AND ARRAY(SELECT unnest(a.ids) ORDER BY 1) = ARRAY(SELECT generate_series(a.minid, a.maxid))
+	AND (a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)) IS NOT UNKNOWN
+	AND a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)
+	AND (a.count = e.eventcount) IS NOT UNKNOWN
+	AND a.count = e.eventcount
 )
 
 --events table is valid if one row of stats is returned where all statistics derived from insert groups data equals the same statistics derived from all rows.
-SELECT 'EVENTS TABLE IS VALID', g.minid AS minid_insert_groups, a.minid AS minid_all_rows, g.maxid AS maxid_insert_groups, a.maxid AS maxid_all_rows,
+SELECT 'VALID' AS events_table_status, g.minid AS minid_insert_groups, a.minid AS minid_all_rows, g.maxid AS maxid_insert_groups, a.maxid AS maxid_all_rows,
 	g.count AS rowcount_insert_groups, a.count AS rowcount_all_rows, g.eventcount AS total_events_insert_groups, a.eventcount AS total_events_all_rows
 FROM get_stats_from_insert_groups AS g,	merge_stats_from_all_rows AS a
 WHERE (g.minid = 1) IS NOT UNKNOWN
 	AND g.minid = 1
 	AND (a.minid = 1) IS NOT UNKNOWN
 	AND a.minid = 1
-	AND g.minid = a.minid AND g.maxid = a.maxid AND g.count = a.count AND g.eventcount = a.eventcount
 	AND (g.minid = a.minid) IS NOT UNKNOWN AND (g.maxid = a.maxid) IS NOT UNKNOWN AND (g.count = a.count) IS NOT UNKNOWN AND (g.eventcount = a.eventcount) IS NOT UNKNOWN
+	AND g.minid = a.minid AND g.maxid = a.maxid AND g.count = a.count AND g.eventcount = a.eventcount
+	AND g.count = a.eventcount
+	AND (g.count = a.eventcount) IS NOT UNKNOWN
