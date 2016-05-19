@@ -1,6 +1,7 @@
 const co = require('co');
 const R = require('ramda');
 var path = require('path');
+const fs = require('fs');
 var bunyan = require('bunyan');
 var program = require('commander');
 const is = require('is_js');
@@ -28,6 +29,9 @@ process.on('SIGTERM', () => {
 	logger.info(`SIGTERM received.`);
 	process.exit(0);
 });
+
+
+const eventsValidationString = fs.readFileSync('test/sql/loadPersonDataValidation.sql', 'utf8');
 
 const compareEvents = (events1, events2, diffIds) => {
 	return new Promise((resolve, reject) => {
@@ -73,7 +77,7 @@ const getEvents = co.wrap(function *(connectionUrl, selectStatement, maxEventsPe
 });
 
 const processEvents = co.wrap(function *(events1ConnectionUrl, events2ConnectionUrl, maxEventsPerRead, thresholdEventId, diffIds) {
-	const selectStatement = `SELECT id, eventTimestamp AS "eventTimestamp", event FROM events
+	const selectStatement = `SELECT id, ts, entity_id, event FROM events
 							WHERE id > ${thresholdEventId} ORDER BY id LIMIT ${maxEventsPerRead}`;
 	const events1 = yield getEvents(events1ConnectionUrl, selectStatement, maxEventsPerRead);
 	const events2 = yield getEvents(events2ConnectionUrl, selectStatement, maxEventsPerRead);
@@ -84,6 +88,26 @@ const processEvents = co.wrap(function *(events1ConnectionUrl, events2Connection
 	// unexpected no events found
 	else {
 		throw new Error('No More Events');
+	}
+});
+
+const isEventsTableValid = co.wrap(function *(dbClient) {
+	logger.info(`Checking events table validity for database ${dbClient.database}`);
+	const result = yield dbUtils.executeSQLStatement(dbClient, eventsValidationString);
+	if (result.rowCount === 1) {
+		const tableStats = result.rows[0];
+		if (R.test(/^VALID/, tableStats.events_table_status)) {
+			logger.info(tableStats, `events table is valid for database ${dbClient.database}`);
+			return true;
+		}
+		else {
+			logger.error(tableStats, `events table is invalid for database ${dbClient.database}`);
+			return false;
+		}
+	}
+	else {
+		logger.error(result, `result returned is not formatted properly`);
+		return false;
 	}
 });
 
@@ -135,6 +159,16 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 			throw new Error(`events table row counts are different.  Client1 Row Count (${dbClient1Database}):  ` +
 				`${utils.formatNumber(dbClient1RowCount)}  Client2 Row Count (${dbClient2Database}):  ${utils.formatNumber(dbClient2RowCount)}`);
 		}
+		const isTable1Valid = yield isEventsTableValid(dbClient1.dbClient);
+		// events table 1 is not valid
+		if (!isTable1Valid) {
+			throw new Error(`events table in ${dbClient1Database} is not valid`);
+		}
+		const isTable2Valid = yield isEventsTableValid(dbClient2.dbClient);
+		// events table 2 is not valid
+		if (!isTable2Valid) {
+			throw new Error(`events table in ${dbClient2Database} is not valid`);
+		}
 		var thresholdEventId = 0;
 		var loopCtr = 0;
 		// determine when to log progress messages given a maximum of 10 progress messages desired during program execution
@@ -145,7 +179,7 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		dbUtils.close(dbClient1);
 		dbUtils.close(dbClient2);
 		logger.info(`Log progress message every ${utils.formatNumber(logCycle * maxEventsPerRead)} events checked`);
-		// compare events maxEventsPerRead per iteration
+		// compare maxEventsPerRead events per iteration
 		while (true) {
 			thresholdEventId = yield processEvents(events1ConnectionUrl, events2ConnectionUrl, maxEventsPerRead, thresholdEventId, diffIds);
 			if (maxDiffs && diffIds.length >= maxDiffs) {
