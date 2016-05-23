@@ -42,9 +42,6 @@ program
 	.option('--count-person <n>', 'number of different person event series to create.  Default 1000.', '1000')
 	.option('--count-filler <n>', 'number of filler events to create.  Default 10000.', '10000')
 	.option('--count-person-delete <n>', 'maximum number of person delete events to create.  Default 50.', '50')
-	.option('--event-start-date <datetime>', 'starting timestamp for created events.  Default 2006-02-08T17:48:59.158Z.', '2006-02-08T17:48:59.158Z')
-	.option('--person-event-timestamp-diff <n>', 'timestamp increase between each person event in millisec.  Default: 1803321', '1803321')
-	.option('--filler-event-timestamp-diff <n>', 'timestamp increase between each filler event in millisec.  Default: 60996', '60996')
 	.option('--dry-run', 'if specified, show run parameters and end without writing any events')
 	.parse(process.argv);
 
@@ -58,12 +55,6 @@ const validateArguments = function(arguments) {
 		errors = R.append('count-filler is not a positive integer:  ' + arguments.countFiller, errors);
 	if (!utils.isStringPositiveInteger(arguments.countPersonDelete))
 		errors = R.append('count-person-delete is not a positive integer:  ' + arguments.countPersonDelete, errors);
-	if (!utils.isStringPositiveInteger(arguments.personEventTimestampDiff))
-		errors = R.append('person-event-timestamp-diff is not a positive integer:  ' + arguments.personEventTimestampDiff, errors);
-	if (!utils.isStringPositiveInteger(arguments.fillerEventTimestampDiff))
-		errors = R.append('filler-event-timestamp-diff is not a positive integer:  ' + arguments.fillerEventTimestampDiff, errors);
-	if (isNaN(new Date(arguments.eventStartDate)))
-		errors = R.append('event-start-date is not a valid date', errors);
 	return errors;
 };
 
@@ -123,18 +114,13 @@ const entityIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
 // number of filler events to create per insert statement
 var fillerEventsPerStatement = Math.ceil(numberOfFillerEvents / numberOfInserts);
 fillerEventsPerStatement = fillerEventsPerStatement >= 1 ? fillerEventsPerStatement : 1;
-// Event timestamp is increased for every event created
-var eventTimestamp = new Date(program.eventStartDate);
-// most recent Event timestamp of all events created
-var maxEventTimestamp = null;
 
 logConfig(config);
 
 logger.info('\nNumber of Persons to Create:  ' + numberOfInserts + '    Number of Filler Events to Create:  ' + numberOfFillerEvents +
 	'    Maximum number of Persons to Delete:  ' + numberPersonDeletes +
 	'\nNumber of Filler Events per Insert:  ' + fillerEventsPerStatement +
-	'    Number of Persons to Create Before Person Delete:  ' + numberPersonEventsToCreateBeforeDelete +
-	'\nEvent Start Date:  ' + eventTimestamp.toISOString() + '\n');
+	'    Number of Persons to Create Before Person Delete:  ' + numberPersonEventsToCreateBeforeDelete + '\n');
 
 if (program.dryRun) {
 	logger.info('dry-run specified, ending program');
@@ -164,11 +150,10 @@ const updateTestingStats = (eventCount) => {
 
 const addTestingStatsToEvent = (event) => event.testingStats = testingStats;
 
-const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted, maxEventTimestamp) {
+const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted) {
 	logger.info('Total Events Created:  ' + countEventsCreated + '  Persons Created:  ' + countPersonCreated +
 					'  Persons Deleted:  ' + countPersonDeleted +
-					'  Person Events Created:  ' + countPersonEventsCreated + '  Filler Events Created:  ' + countFillerEventsCreated +
-					'\nMost recent Event Date for Created Events:  ' + maxEventTimestamp.toISOString() + '\n');
+					'  Person Events Created:  ' + countPersonEventsCreated + '  Filler Events Created:  ' + countFillerEventsCreated + '\n');
 };
 
 // return random integer between min (inclusive) and max (exclusive)
@@ -279,9 +264,8 @@ const createPersonEventValues = function(countPersonCreated) {
 	result.events.forEach(function(event) {
 		addTestingStatsToEvent(event);
 		// id[idx] represent the parameter value for the id column where idx is a 1-based index starting at 1
-		eventValues[eventValues.length] = `($1[${eventValues.length + 1}], '${eventTimestamp.toISOString()}', '${getRandomEntityId()}', ` +
+		eventValues[eventValues.length] = `($1[${eventValues.length + 1}], $2, '${getRandomEntityId()}', ` +
 											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
-		eventTimestamp = new Date(eventTimestamp.valueOf() + (personEventDiffInMillisecs));
 	});
 	return {events: eventValues, countPersonDeleted: result.countPersonDeleted};
 };
@@ -291,10 +275,8 @@ const createFillerEventValues = function(idx) {
 	createFillerEvents(fillerEventsPerStatement).forEach(function(event) {
 		addTestingStatsToEvent(event);
 		// id[idx] represent the parameter value for the id column where idx is a 1-based
-		eventValues[eventValues.length] = `($1[${idx}], '${eventTimestamp.toISOString()}', '${getRandomEntityId()}', ` +
+		eventValues[eventValues.length] = `($1[${idx}], $2, '${getRandomEntityId()}', ` +
 											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
-		maxEventTimestamp = eventTimestamp;
-		eventTimestamp = new Date(eventTimestamp.valueOf() + (fillerEventDiffInMillisecs));
 		idx++;
 	});
 	return eventValues;
@@ -343,7 +325,7 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 		totalPersonDeleted += createdEvents.countPersonDeleted;
 		totalInsertStatementsCreated++;
 	}
-	logCounts(totalPersonEventsCreated, totalFillerEventsCreated, totalEventsCreated, totalPersonCreated, totalPersonDeleted, maxEventTimestamp);
+	logCounts(totalPersonEventsCreated, totalFillerEventsCreated, totalEventsCreated, totalPersonCreated, totalPersonDeleted);
 });
 
 const main = co.wrap(function *(connectionUrl, connectTimeout) {
