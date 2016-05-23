@@ -137,18 +137,23 @@ const testingStats = {
 	programId: uuid.v4(),
 	dbOperationNum: 0,
 	dbOperationId: uuid.v4(),
+	dbOperationEventNum: 0,
 	dbOperationEventCount: 0,
 	dbOperationTS: new Date().toISOString()
 };
 
-const updateTestingStats = (eventCount) => {
+const initTestingStatsForDbOperation = (eventCount) => {
 	testingStats.dbOperationNum++;
 	testingStats.dbOperationId = uuid.v4();
+	testingStats.dbOperationEventNum = 0;
 	testingStats.dbOperationEventCount = eventCount;
 	testingStats.dbOperationTS = new Date().toISOString();
 };
 
-const addTestingStatsToEvent = (event) => event.testingStats = testingStats;
+const addTestingStatsToEvent = (event) => {
+	event.testingStats = testingStats;
+	event.testingStats.dbOperationEventNum++;
+};
 
 const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted) {
 	logger.info('Total Events Created:  ' + countEventsCreated + '  Persons Created:  ' + countPersonCreated +
@@ -260,7 +265,7 @@ const createFillerEvents = function(countToCreate) {
 const createPersonEventValues = function(countPersonCreated) {
 	var eventValues = [];
 	var result = createPersonEvents(countPersonCreated);
-	updateTestingStats(result.events.length + fillerEventsPerStatement);
+	initTestingStatsForDbOperation(result.events.length + fillerEventsPerStatement);
 	result.events.forEach(function(event) {
 		addTestingStatsToEvent(event);
 		// id[idx] represent the parameter value for the id column where idx is a 1-based index starting at 1
@@ -307,7 +312,7 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	var totalInsertStatementsCreated = 0;
 	while (totalInsertStatementsCreated < numberOfInserts) {
 		var createdEvents = createEvents(totalPersonCreated);
-		var insertStatement = `SELECT insert_events($$${createdEvents.events.join(', ')}$$)`;
+		var insertStatement = `SELECT insert_events(ARRAY[$$${createdEvents.events.join(', ')}$$])`;
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
 		if (result.rowCount === 1) {
 			var row1 = result.rows[0];
