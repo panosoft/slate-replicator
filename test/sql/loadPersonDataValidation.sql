@@ -26,8 +26,12 @@ sum_eventcount_from_insert_groups AS (
 ),
 --get id statistics from all rows in the events table
 get_agg_stats_from_all_rows AS (
-	SELECT min(id) AS minid, max(id) AS maxid, array_agg(id) AS ids, count(id) as count
+	SELECT min(id) AS minid, max(id) AS maxid, count(id) as count
 		FROM events
+),
+--get ordered ids from all rows in the events table.  id column in events table should be consecutive when ordered by ts, id.
+get_ordered_ids_from_all_rows AS (
+	SELECT ARRAY(SELECT id from events ORDER by ts, id) AS ids
 ),
 --get id statistics and total events inserted into the table from insert groups data.  validate event ids and total events inserted.
 --event ids must start at 1 and be consecutive integers.  total events inserted must equal total row count.
@@ -54,8 +58,8 @@ merge_agg_stats_from_all_rows AS (
 			WHEN
 				(a.minid = 1) IS NOT UNKNOWN
 				AND a.minid = 1
-				AND (ARRAY(SELECT unnest(a.ids) ORDER BY 1) = ARRAY(SELECT generate_series(a.minid, a.maxid))) IS NOT UNKNOWN
-				AND ARRAY(SELECT unnest(a.ids) ORDER BY 1) = ARRAY(SELECT generate_series(a.minid, a.maxid))
+				AND (oi.ids = ARRAY(SELECT generate_series(a.minid, a.maxid))) IS NOT UNKNOWN
+				AND oi.ids = ARRAY(SELECT generate_series(a.minid, a.maxid))
 				AND (a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)) IS NOT UNKNOWN
 				AND a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)
 				AND (a.count = e.eventcount) IS NOT UNKNOWN
@@ -64,7 +68,7 @@ merge_agg_stats_from_all_rows AS (
 			ELSE false
 		END AS all_rows_valid,
 		a.minid, a.maxid, a.count, e.eventcount
-	FROM get_agg_stats_from_all_rows AS a, sum_eventcount_from_insert_groups AS e
+	FROM get_agg_stats_from_all_rows AS a, get_ordered_ids_from_all_rows AS oi, sum_eventcount_from_insert_groups AS e
 )
 
 SELECT
