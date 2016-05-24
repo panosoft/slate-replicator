@@ -40,7 +40,7 @@ const compareEvents = (events1, events2, diffIds) => {
 				diffIds[diffIds.length] = utils.parseInteger(event1.id);
 			}
 		});
-		resolve(utils.parseInteger(events1[events1.length - 1].id));
+		resolve({countEvents: events1.length, thresholdEventId: utils.parseInteger(events1[events1.length - 1].id)});
 	});
 };
 
@@ -82,8 +82,8 @@ const processEvents = co.wrap(function *(events1ConnectionUrl, events2Connection
 	const events1 = yield getEvents(events1ConnectionUrl, selectStatement, maxEventsPerRead);
 	const events2 = yield getEvents(events2ConnectionUrl, selectStatement, maxEventsPerRead);
 	// events exist
-	if (events1.length > 0) {
-		return yield compareEvents(events1, events2, diffIds);
+	if (events1.events.length > 0) {
+		return yield compareEvents(events1.events, events2.events, diffIds);
 	}
 	// unexpected no events found
 	else {
@@ -169,7 +169,9 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		if (!isTable2Valid) {
 			throw new Error(`events table in ${dbClient2Database} is not valid`);
 		}
+		var result;
 		var thresholdEventId = 0;
+		var countEvents = 0;
 		var loopCtr = 0;
 		// determine when to log progress messages given a maximum of 10 progress messages desired during program execution
 		const logCycle = Math.ceil(Math.ceil(maxDbClient1EventId / maxEventsPerRead) / 10);
@@ -181,7 +183,9 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		logger.info(`Log progress message every ${utils.formatNumber(logCycle * maxEventsPerRead)} events checked`);
 		// compare maxEventsPerRead events per iteration
 		while (true) {
-			thresholdEventId = yield processEvents(events1ConnectionUrl, events2ConnectionUrl, maxEventsPerRead, thresholdEventId, diffIds);
+			result = yield processEvents(events1ConnectionUrl, events2ConnectionUrl, maxEventsPerRead, thresholdEventId, diffIds);
+			thresholdEventId = result.thresholdEventId;
+			countEvents += result.countEvents;
 			if (maxDiffs && diffIds.length >= maxDiffs) {
 				logger.error(`Maximum Event differences (${utils.formatNumber(maxDiffs)}) reached.  Program ending.`);
 				break;
@@ -199,6 +203,7 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 				logger.info(`Events up to event id ${thresholdEventId} have been compared.  Event Differences:  ${utils.formatNumber(diffIds.length)}`);
 			}
 		}
+		logger.info(`${utils.formatNumber(countEvents)} events compared.  Maximum Event Id Compared:  ${thresholdEventId}`);
 		// event differences occurred
 		if (diffIds.length > 0) {
 			logger.error(`Event content differs at the following events table row ids in databases ${dbClient1Database} and ${dbClient2Database}:  ${R.join(',', diffIds)}`);
