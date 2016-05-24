@@ -299,13 +299,13 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 			var row1 = result.rows[0];
 			if (!(row1['insert_events'] && row1['insert_events'] === countEventsCreated)) {
 				errorMessage = `Program logic error.  Event count doesn't match rows inserted.  Event Count:  ${countEventsCreated}  Rows Inserted:  ${row1['insert_events']}`;
-				logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(1, 300)}...`);
+				logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(0, 4000)}...`);
 				throw new Error(errorMessage);
 			}
 		}
 		else {
-			errorMessage = `Program logic error.  Expected result array of one object to be returned.  Result:  ${result}`;
-			logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(1, 300)}...`);
+			errorMessage = `Program logic error.  Expected result array of one object to be returned.  Result:  ${JSON.stringify(result)}`;
+			logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(0, 4000)}...`);
 			throw new Error(errorMessage);
 		}
 		totalPersonEventsCreated += personResult.countPersonEvents;
