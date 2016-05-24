@@ -99,25 +99,25 @@ if (configErrors.length > 0) {
 // db connection url
 const connectionUrl = dbUtils.createConnectionUrl(config.eventSource);
 // total number of insert statements to create
-const numberOfInserts = parseInt(program.countPerson, 10);
+const numberOfPersonsToCreate = parseInt(program.countPerson, 10);
 // total number of filler events to create
 const numberOfFillerEvents = parseInt(program.countFiller, 10);
 // maximum number of person delete events to create
 const numberPersonDeletes = parseInt(program.countPersonDelete, 10);
 // number of person events created before person deleted
-var numberPersonEventsToCreateBeforeDelete = Math.ceil(numberOfInserts / numberPersonDeletes);
+var numberPersonEventsToCreateBeforeDelete = Math.ceil(numberOfPersonsToCreate / numberPersonDeletes);
 numberPersonEventsToCreateBeforeDelete = numberPersonEventsToCreateBeforeDelete >= 1 ? numberPersonEventsToCreateBeforeDelete : 1;
 // uniqueIds
 const initiatorIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
 const entityIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
 
 // number of filler events to create per insert statement
-var fillerEventsPerStatement = Math.ceil(numberOfFillerEvents / numberOfInserts);
+var fillerEventsPerStatement = Math.ceil(numberOfFillerEvents / numberOfPersonsToCreate);
 fillerEventsPerStatement = fillerEventsPerStatement >= 1 ? fillerEventsPerStatement : 1;
 
 logConfig(config);
 
-logger.info('\nNumber of Persons to Create:  ' + numberOfInserts + '    Number of Filler Events to Create:  ' + numberOfFillerEvents +
+logger.info('\nNumber of Persons to Create:  ' + numberOfPersonsToCreate + '    Number of Filler Events to Create:  ' + numberOfFillerEvents +
 	'    Maximum number of Persons to Delete:  ' + numberPersonDeletes +
 	'\nNumber of Filler Events per Insert:  ' + fillerEventsPerStatement +
 	'    Number of Persons to Create Before Person Delete:  ' + numberPersonEventsToCreateBeforeDelete + '\n');
@@ -181,9 +181,9 @@ const getPersonToDelete = function(currentPersonCount) {
 };
 
 // create a set of person events
-const createPersonEvents = function(countPersonCreated) {
+const createPersonEvents = function(totalPersonCreated) {
 	var events = [];
-	var countPersonDeleted = 0;
+	var countPersonDeletedEvents = 0;
 	const personId = uuid.v4();
 	personIds[personId] = true;
 	events[events.length] = {
@@ -220,21 +220,21 @@ const createPersonEvents = function(countPersonCreated) {
 			command: 'Add person ssn'
 		}
 	};
-	if ((countPersonCreated + 1) % numberPersonEventsToCreateBeforeDelete === 0) {
+	if ((totalPersonCreated + 1) % numberPersonEventsToCreateBeforeDelete === 0) {
 		
 		events[events.length] = {
 			name: 'PersonDeleted',
 			data: {
-				id: getPersonToDelete(countPersonCreated + 1)
+				id: getPersonToDelete(totalPersonCreated + 1)
 			},
 			metadata: {
 				initiatorId: getRandomInitiatorId(),
 				command: 'Delete person'
 			}
 		};
-		countPersonDeleted++;
+		countPersonDeletedEvents++;
 	}
-	return {events: events, countPersonDeleted: countPersonDeleted};
+	return {events: events, countPersonEvents: events.length, countPersonDeletedEvents: countPersonDeletedEvents};
 };
 
 // create a set of filler events
@@ -258,15 +258,16 @@ const createFillerEvents = function(countToCreate) {
 	return events;
 };
 
-const createPersonInsertValuesResult = function(countPersonCreated) {
+const createPersonInsertValuesResult = function(totalPersonCreated) {
 	var eventColumns = [];
-	var result = createPersonEvents(countPersonCreated);
+	var result = createPersonEvents(totalPersonCreated);
 	initTestingStatsForDbOperation(result.events.length);
 	result.events.forEach(function(event, idx) {
 		addTestingStatsToEvent(event, idx);
 		eventColumns[eventColumns.length] = {entityId: getRandomEntityId(), event: event};
 	});
-	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countPersonCreated: result.events.length, countPersonDeleted: result.countPersonDeleted};
+	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countPersonEvents: result.countPersonEvents,
+		countPersonDeletedEvents: result.countPersonDeletedEvents};
 };
 
 const createFillerInsertValuesResult = function() {
@@ -277,7 +278,7 @@ const createFillerInsertValuesResult = function() {
 		addTestingStatsToEvent(event, idx);
 		eventColumns[eventColumns.length] = {entityId: getRandomEntityId(), event: event};
 	});
-	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countFillerCreated: events.length};
+	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countFillerEvents: events.length};
 };
 
 const createAndInsertEvents = co.wrap(function *(dbClient) {
@@ -287,26 +288,31 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	var totalPersonCreated = 0;
 	var totalPersonDeleted = 0;
 	var totalInsertStatementsCreated = 0;
-	while (totalInsertStatementsCreated < numberOfInserts) {
+	var errorMessage = '';
+	while (totalPersonCreated < numberOfPersonsToCreate) {
 		var personResult = createPersonInsertValuesResult(totalPersonCreated);
 		var fillerResult = createFillerInsertValuesResult();
-		var eventsCreated = personResult.countPersonCreated + personResult.countPersonDeleted + fillerResult.countFillerCreated;
+		var countEventsCreated = personResult.countPersonEvents + fillerResult.countFillerEvents;
 		var insertStatement = utils.createInsertEventsSQLStatement([personResult.insertValues, fillerResult.insertValues]);
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
 		if (result.rowCount === 1) {
 			var row1 = result.rows[0];
-			if (!(row1['insert_events'] && row1['insert_events'] === eventsCreated)) {
-				throw new Error(`Program logic error.  Event count doesn't match rows inserted.  Event Count:  ${eventsCreated}  Rows Inserted:  ${row1['insert_events']}`);
+			if (!(row1['insert_events'] && row1['insert_events'] === countEventsCreated)) {
+				errorMessage = `Program logic error.  Event count doesn't match rows inserted.  Event Count:  ${countEventsCreated}  Rows Inserted:  ${row1['insert_events']}`;
+				logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(1, 300)}...`);
+				throw new Error(errorMessage);
 			}
 		}
 		else {
-			throw new Error(`Program logic error.  Expected result array of one object to be returned.  Result:  ${result}`);
+			errorMessage = `Program logic error.  Expected result array of one object to be returned.  Result:  ${result}`;
+			logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(1, 300)}...`);
+			throw new Error(errorMessage);
 		}
-		totalPersonEventsCreated += personResult.countPersonCreated;
-		totalFillerEventsCreated += fillerResult.countFiller;
-		totalEventsCreated += eventsCreated;
+		totalPersonEventsCreated += personResult.countPersonEvents;
+		totalFillerEventsCreated += fillerResult.countFillerEvents;
+		totalEventsCreated += countEventsCreated;
 		totalPersonCreated++;
-		totalPersonDeleted += personResult.countPersonDeleted;
+		totalPersonDeleted += personResult.countPersonDeletedEvents;
 		totalInsertStatementsCreated = totalInsertStatementsCreated + 2;
 	}
 	logCounts(totalPersonEventsCreated, totalFillerEventsCreated, totalEventsCreated, totalPersonCreated, totalPersonDeleted);
