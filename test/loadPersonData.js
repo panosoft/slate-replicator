@@ -128,10 +128,6 @@ if (program.dryRun) {
 }
 
 var personIds = {};
-// amount to increment eventTimestamp for every person row
-const personEventDiffInMillisecs = parseInt(program.personEventTimestampDiff, 10);
-// amount to increment eventTimestamp for every filler row
-const fillerEventDiffInMillisecs = parseInt(program.fillerEventTimestampDiff, 10);
 
 const testingStats = {
 	programId: uuid.v4(),
@@ -150,9 +146,9 @@ const initTestingStatsForDbOperation = (eventCount) => {
 	testingStats.dbOperationTS = new Date().toISOString();
 };
 
-const addTestingStatsToEvent = (event) => {
-	event.testingStats = testingStats;
-	event.testingStats.dbOperationEventNum++;
+const addTestingStatsToEvent = (event, idx) => {
+	event.testingStats = R.clone(testingStats);
+	event.testingStats.dbOperationEventNum = idx + 1;
 };
 
 const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted) {
@@ -262,45 +258,26 @@ const createFillerEvents = function(countToCreate) {
 	return events;
 };
 
-const createPersonEventValues = function(countPersonCreated) {
-	var eventValues = [];
+const createPersonInsertValuesResult = function(countPersonCreated) {
+	var eventColumns = [];
 	var result = createPersonEvents(countPersonCreated);
-	initTestingStatsForDbOperation(result.events.length + fillerEventsPerStatement);
-	result.events.forEach(function(event) {
-		addTestingStatsToEvent(event);
-		// id[idx] represent the parameter value for the id column where idx is a 1-based index starting at 1
-		eventValues[eventValues.length] = `($1[${eventValues.length + 1}], $2, '${getRandomEntityId()}', ` +
-											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
+	initTestingStatsForDbOperation(result.events.length);
+	result.events.forEach(function(event, idx) {
+		addTestingStatsToEvent(event, idx);
+		eventColumns[eventColumns.length] = {entityId: getRandomEntityId(), event: event};
 	});
-	return {events: eventValues, countPersonDeleted: result.countPersonDeleted};
+	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countPersonCreated: result.events.length, countPersonDeleted: result.countPersonDeleted};
 };
 
-const createFillerEventValues = function(idx) {
-	var eventValues = [];
-	createFillerEvents(fillerEventsPerStatement).forEach(function(event) {
-		addTestingStatsToEvent(event);
-		// id[idx] represent the parameter value for the id column where idx is a 1-based
-		eventValues[eventValues.length] = `($1[${idx}], $2, '${getRandomEntityId()}', ` +
-											`'${JSON.stringify(event).replace(/'/g, '\'\'')}')`;
-		idx++;
+const createFillerInsertValuesResult = function() {
+	var eventColumns = [];
+	const events = createFillerEvents(fillerEventsPerStatement);
+	initTestingStatsForDbOperation(events.length);
+	events.forEach(function(event, idx) {
+		addTestingStatsToEvent(event, idx);
+		eventColumns[eventColumns.length] = {entityId: getRandomEntityId(), event: event};
 	});
-	return eventValues;
-};
-const logDbStatus = co.wrap(function *(dbClient) {
-	const rowCount = yield utils.getEventCount(dbClient);
-	// get maximum event source event id
-	const maxEventId = yield utils.getMaximumEventId(dbClient);
-	logger.info(`Event Source Client status - Database: ${dbClient.database}` +
-		`    Host:  ${dbClient.host}    user:  ${dbClient.user}` + `    SSL Connection:  ${dbClient.ssl}` +
-		`    Row Count:  ${utils.formatNumber(rowCount)}    Maximum Event Id:  ${maxEventId}`);
-});
-
-const createEvents = (totalPersonCreated) => {
-	const createPersonResult = createPersonEventValues(totalPersonCreated);
-	var personEvents = createPersonResult.events;
-	// pass the idx to be used for the first filler event which is 1 + the last idx used for the person events
-	const fillerEvents = createFillerEventValues(createPersonResult.events.length + 1);
-	return {events: personEvents.concat(fillerEvents), countPersonCreated: personEvents.length, countPersonDeleted: createPersonResult.countPersonDeleted, countFiller: fillerEvents.length};
+	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countFillerCreated: events.length};
 };
 
 const createAndInsertEvents = co.wrap(function *(dbClient) {
@@ -311,26 +288,37 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	var totalPersonDeleted = 0;
 	var totalInsertStatementsCreated = 0;
 	while (totalInsertStatementsCreated < numberOfInserts) {
-		var createdEvents = createEvents(totalPersonCreated);
-		var insertStatement = `SELECT insert_events(ARRAY[$$${createdEvents.events.join(', ')}$$])`;
+		var personResult = createPersonInsertValuesResult(totalPersonCreated);
+		var fillerResult = createFillerInsertValuesResult();
+		var eventsCreated = personResult.countPersonCreated + personResult.countPersonDeleted + fillerResult.countFillerCreated;
+		var insertStatement = utils.createInsertEventsSQLStatement([personResult.insertValues, fillerResult.insertValues]);
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
 		if (result.rowCount === 1) {
 			var row1 = result.rows[0];
-			if (!(row1['insert_events'] && row1['insert_events'] === createdEvents.events.length)) {
-				throw new Error(`Program logic error.  Event count doesn't match rows inserted.  Event Count:  ${createdEvents.events.length}  Rows Inserted:  ${row1['insert_events']}`);
+			if (!(row1['insert_events'] && row1['insert_events'] === eventsCreated)) {
+				throw new Error(`Program logic error.  Event count doesn't match rows inserted.  Event Count:  ${eventsCreated}  Rows Inserted:  ${row1['insert_events']}`);
 			}
 		}
 		else {
 			throw new Error(`Program logic error.  Expected result array of one object to be returned.  Result:  ${result}`);
 		}
-		totalPersonEventsCreated += createdEvents.countPersonCreated;
-		totalFillerEventsCreated += createdEvents.countFiller;
-		totalEventsCreated += createdEvents.events.length;
+		totalPersonEventsCreated += personResult.countPersonCreated;
+		totalFillerEventsCreated += fillerResult.countFiller;
+		totalEventsCreated += eventsCreated;
 		totalPersonCreated++;
-		totalPersonDeleted += createdEvents.countPersonDeleted;
-		totalInsertStatementsCreated++;
+		totalPersonDeleted += personResult.countPersonDeleted;
+		totalInsertStatementsCreated = totalInsertStatementsCreated + 2;
 	}
 	logCounts(totalPersonEventsCreated, totalFillerEventsCreated, totalEventsCreated, totalPersonCreated, totalPersonDeleted);
+});
+
+const logDbStatus = co.wrap(function *(dbClient) {
+	const rowCount = yield utils.getEventCount(dbClient);
+	// get maximum event source event id
+	const maxEventId = yield utils.getMaximumEventId(dbClient);
+	logger.info(`Event Source Client status - Database: ${dbClient.database}` +
+		`    Host:  ${dbClient.host}    user:  ${dbClient.user}` + `    SSL Connection:  ${dbClient.ssl}` +
+		`    Row Count:  ${utils.formatNumber(rowCount)}    Maximum Event Id:  ${maxEventId}`);
 });
 
 const main = co.wrap(function *(connectionUrl, connectTimeout) {
