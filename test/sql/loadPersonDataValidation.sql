@@ -4,6 +4,7 @@ WITH get_stats_by_insert_groups AS (
 		event::jsonb->'testingStats'->>'dbOperationId' AS dboperationid,
 		event::jsonb->'testingStats'->'dbOperationNum' AS dboperationnum,
 		(event::jsonb->'testingStats'->>'dbOperationEventCount')::bigint AS eventcount,
+		array_agg((event::jsonb->'testingStats'->>'dbOperationEventNum')::bigint) AS eventnums,
 		array_agg(id) AS ids,
 		min(id) AS minid,
 		max(id) AS maxid,
@@ -13,10 +14,12 @@ WITH get_stats_by_insert_groups AS (
 ),
 update_stats_by_insert_groups AS (
 	SELECT  programId, dboperationid, dboperationnum,
-		--sort q.ids
+		--sort ids and eventnums
 		ARRAY(SELECT unnest(ids) ORDER BY 1) as ids,
+		ARRAY(SELECT unnest(eventnums) ORDER BY 1) as eventnums,
 		minid, maxid, count, eventcount,
-		ARRAY(SELECT generate_series(minid, maxid)) AS generatedids
+		ARRAY(SELECT generate_series(minid, maxid)) AS generatedids,
+		ARRAY(SELECT generate_series(1, eventcount)) AS generatedeventnums
 	FROM get_stats_by_insert_groups
 ),
 --get the total events inserted into the events table from insert groups data
@@ -42,6 +45,7 @@ get_agg_stats_from_insert_groups AS (
 		(SELECT
 			CASE
 				WHEN (count = eventcount) IS NOT UNKNOWN AND count = eventcount AND (ids = generatedids) IS NOT UNKNOWN AND ids = generatedids
+					AND (eventnums = generatedeventnums) IS NOT UNKNOWN AND eventnums = generatedeventnums
 				THEN true
 				ELSE false
 			END AS insert_group_valid,
