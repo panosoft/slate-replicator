@@ -1,6 +1,4 @@
 var config = {
-	// optional parameter.  maximum events read from the eventsSource events table per database operation.  minimum value:  10000.
-	maxEventsPerRead: 50000,
 	// optional parameter.  maximum events written to the replicationDestinations events tables per database operation.  minimum value:  10000.
 	maxEventsPerWrite: 10000,
 	// optional parameter.  database connection timeout in milliseconds.  default value:  15000.
