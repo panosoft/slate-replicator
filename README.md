@@ -32,8 +32,6 @@ The replicator copies in a transactional manner so it can be stopped at any time
 
 ```javascript
   var config = {
-    // optional parameter.  maximum events read from the eventsSource events table per database operation.  minimum value:  10000.
-    maxEventsPerRead: 50000,
     // optional parameter.  maximum events written to the replicationDestinations events tables per database operation.  minimum value:  10000.
     maxEventsPerWrite: 10000,
     // optional parameter.  database connection timeout in milliseconds.  default value:  15000.
@@ -68,9 +66,6 @@ The replicator copies in a transactional manner so it can be stopped at any time
   };
   module.exports = config;
   ```
-#### maxEventsPerRead
-> An optional parameter that specifies the maximum number of events that can be read from the events table in the `eventSource` database per read operation.  Default and minimum value is `10000`.
-
 #### maxEventsPerWrite
 > An optional parameter that specifies the maximum number of events that can be written to the events table in each `replicationDestination` database per write operation.  Default and minimum value is `10000`.
 
@@ -92,11 +87,15 @@ The replicator copies in a transactional manner so it can be stopped at any time
 > An array of one or more objects containing parameters identical to `eventSource` parameters.  These parameters are used to connect to `replicationDestination` databases which must contain a table called `events`.  The `replicationDestination` databases are where the events from the `eventSource` database `events` table are copied.
 
 # Database Schema
-All databases used in the replication process must have an `events` table that possess a similar schema.  While sharing the same column names, the schema for the `events` table in the `eventSource` database is slightly different than the one in the `replicationDestination` database(s).
+All databases used in the replication process must have an `events` table that have the same schema.
 
-The `id` column in the `events` table in the `eventSource` database is defined as a `bigserial` while in the `replicationDestination` databases it is defined as a `bigint`.
+The `eventSource` database has more functionality than the `replicationDestination` databases.
 
-Additionally the `events` table in the `eventSource` database has a trigger and trigger function that support the notification process mentioned in the [`Run`](#Run) section.
+The `events` table in the `eventSource` database has a trigger and trigger function that support the notification process mentioned in the [`Run`](#Run) section.
+
+Also the `eventSource` database has an `id` table that is used to provide values for the `id` column in the `events` table.
+
+There is also an `insert_events` function in the `eventSource` database that is used to insert events into the `events` table in a transactional manner.
 
 For further database schema information, please refer to [`slate-init-db`](https://github.com/panosoft/slate-init-db).
 
@@ -126,11 +125,13 @@ There are two Testing tools provided in the test directory to aid testing the `s
 #### loadPersonData.js
 This program can be used to test `slate-replicator` by loading the `events` table in the `eventSource` database with realistic looking event data supplied by using the [`faker`](https://www.npmjs.com/package/faker) library.
 #### eventsDiff.js
-This program compares the data in the `events` table in the `eventSource` database with an `events` table in a `replicationDestination` database.  All event data row differences can be reported or the program can stop after detecting a configurable number of event data row differences.
+This program validates the data in each `events` table being compared, and then compares data in the `events` table in the `eventSource` database with data in the `events` table in the `replicationDestination` database specified in the configuration file.
+
+All `events` data row differences can be reported or the program can stop after detecting a configurable number of `events` data row differences.
 
 The `loadPersonData` and `eventsDiff` programs can be used to test `slate-replicator` in the following manner:
-- Run the `loadPersonData` program to create data in the `events` table in the `eventSource` database
-- Run the `slate-replicator` to replicate the test data to an `events` table in a `replicationDestination` database, and stop the `slate-replicator` using `Cntrl-C` when replication is complete
-- Configure and run the `eventsDiff` program to compare data in the two `events` tables processed by the replicator program.  If the replicator ran properly, then there should be no event differences reported by the `eventsDiff` program.
+- Run the `loadPersonData` program to create data in the `events` table in the `eventSource` database.  Multiple `loadPersonData` programs can be run at the same time for a more robust test.
+- Run the `slate-replicator` to replicate the test data to an `events` table in a `replicationDestination` database, and stop the `slate-replicator` using `Cntrl-C` when replication is complete.  The `slate-replicator` program can be started before, during, or after the `loadPersonData` program(s) are running.
+- Configure and run the `eventsDiff` program to validate and compare data in the two `events` tables processed by the replicator program.  If the replicator ran properly, then there should be no validation errors or event differences reported by the `eventsDiff` program.
 
 Further information regarding how to use the test tools can be found by reading the comments in the test programs.
