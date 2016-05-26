@@ -1,5 +1,5 @@
 # slate-replicator
-Postgresql Event Source Table Replicator
+Postgresql Event Source Table Replicator For slate
 
 The purpose of the slate-replicator is to copy a table of immutable events from a Postgresql Event Source database to an events table in one or more Destination databases.
 
@@ -87,7 +87,7 @@ The replicator copies in a transactional manner so it can be stopped at any time
 > An array of one or more objects containing parameters identical to `eventSource` parameters.  These parameters are used to connect to `replicationDestination` databases which must contain a table called `events`.  The `replicationDestination` databases are where the events from the `eventSource` database `events` table are copied.
 
 # Database Schema
-All databases used in the replication process must have an `events` table that have the same schema.
+All databases used in the replication process must have an `events` table that has the same schema.
 
 The `eventSource` database has more functionality than the `replicationDestination` databases.
 
@@ -125,9 +125,9 @@ There are two Testing tools provided in the test directory to aid testing the `s
 #### loadPersonData.js
 This program can be used to test `slate-replicator` by loading the `events` table in the `eventSource` database with realistic looking event data supplied by using the [`faker`](https://www.npmjs.com/package/faker) library.
 #### eventsDiff.js
-This program validates the data in each `events` table being compared, and then compares data in the `events` table in the `eventSource` database with data in the `events` table in the `replicationDestination` database specified in the configuration file.
+This program validates the data in each `events` table being compared, and then compares data in the `events` table in the `eventSource` database with data in the `events` table in the `replicationDestination` database as specified in the configuration file.
 
-All `events` data row differences can be reported or the program can stop after detecting a configurable number of `events` data row differences.
+This program can be run such that all `events` data row differences can be reported or the program can stop after detecting a configurable number of `events` data row differences.
 
 The `loadPersonData` and `eventsDiff` programs can be used to test `slate-replicator` in the following manner:
 - Run the `loadPersonData` program to create data in the `events` table in the `eventSource` database.  Multiple `loadPersonData` programs can be run at the same time for a more robust test.
