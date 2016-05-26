@@ -33,6 +33,11 @@ process.on('SIGTERM', () => {
 
 const eventsValidationString = fs.readFileSync('test/sql/loadPersonDataValidation.sql', 'utf8');
 
+const logProgress = (delayInSecs) => {
+	const start = new Date();
+	return setInterval(() => logger.info(`--------> Operation Elapsed Time:  ${Math.round((new Date() - start) / 1000)} seconds`), delayInSecs * 1000);
+};
+
 const compareEvents = (events1, events2, diffIds) => {
 	return new Promise((resolve, reject) => {
 		events1.forEach(function (event1, i) {
@@ -92,8 +97,10 @@ const processEvents = co.wrap(function *(events1ConnectionUrl, events2Connection
 });
 
 const isEventsTableValid = co.wrap(function *(dbClient) {
-	logger.info(`Checking events table validity for database ${dbClient.database}`);
+	logger.info(`Checking events table validity for database ${dbClient.database}.  NOTE:  This operation may take several minutes.`);
+	const o = logProgress(60);
 	const result = yield dbUtils.executeSQLStatement(dbClient, eventsValidationString);
+	clearInterval(o);
 	if (result.rowCount === 1) {
 		const tableStats = result.rows[0];
 		if (R.test(/^VALID/, tableStats.events_table_status)) {
