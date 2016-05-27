@@ -32,7 +32,7 @@ process.on('SIGTERM', () => {
 	logger.info(`SIGTERM received.`);
 	process.exit(0);
 });
-process.on('exit', function () {
+process.on('exit', () => {
 	const elapsed = Date.now() - startDate.getTime();
 	logger.info('\n### Elapsed: ' + elapsed / 1000 + ' ###\n');
 });
@@ -45,7 +45,7 @@ program
 	.option('--dry-run', 'if specified, show run parameters and end without writing any events')
 	.parse(process.argv);
 
-const validateArguments = function(arguments) {
+const validateArguments = arguments => {
 	var errors = [];
 	if (!arguments.configFilename || is.not.string(arguments.configFilename))
 		errors = R.append('config-filename is invalid:  ' + arguments.configFilename, errors);
@@ -109,7 +109,7 @@ var numberPersonEventsToCreateBeforeDelete = Math.ceil(numberOfPersonsToCreate /
 numberPersonEventsToCreateBeforeDelete = numberPersonEventsToCreateBeforeDelete >= 1 ? numberPersonEventsToCreateBeforeDelete : 1;
 // uniqueIds
 const initiatorIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
-const entityIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
+const entityIdList = [uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4(), uuid.v4()];
 
 // number of filler events to create per insert statement
 var fillerEventsPerStatement = Math.ceil(numberOfFillerEvents / numberOfPersonsToCreate);
@@ -151,27 +151,27 @@ const addTestingStatsToEvent = (event, idx) => {
 	event.testingStats.dbOperationEventNum = idx + 1;
 };
 
-const logCounts = function(countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted) {
+const logCounts = (countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted) => {
 	logger.info('Total Events Created:  ' + countEventsCreated + '  Persons Created:  ' + countPersonCreated +
 					'  Persons Deleted:  ' + countPersonDeleted +
 					'  Person Events Created:  ' + countPersonEventsCreated + '  Filler Events Created:  ' + countFillerEventsCreated + '\n');
 };
 
 // return random integer between min (inclusive) and max (exclusive)
-const getRandomInt = function(min, max) {
+const getRandomInt = (min, max) => {
   return Math.floor(Math.random() * (max - min)) + min;
 };
 
-const getRandomInitiatorId = function() {
+const getRandomInitiatorId = () => {
 	return initiatorIdList[getRandomInt(0, initiatorIdList.length)];
 };
 
-const getRandomEntityId = function() {
-	return entityIdList[getRandomInt(0, initiatorIdList.length)];
+const getRandomEntityId = () => {
+	return entityIdList[getRandomInt(0, entityIdList.length)];
 };
 
 // return personId to delete from list of personIds created
-const getPersonToDelete = function(currentPersonCount) {
+const getPersonToDelete = currentPersonCount => {
 	const personIdList = Object.keys(personIds);
 	const personId = personIdList[getRandomInt(0, personIdList.length)];
 	logger.info('Person Deletion Stats:  Current Person Count:  ' + currentPersonCount + '  personId Deleted:  ' + personId + '\n');
@@ -181,7 +181,7 @@ const getPersonToDelete = function(currentPersonCount) {
 };
 
 // create a set of person events
-const createPersonEvents = function(totalPersonCreated) {
+const createPersonEvents = totalPersonCreated => {
 	var events = [];
 	var countPersonDeletedEvents = 0;
 	const personId = uuid.v4();
@@ -238,13 +238,13 @@ const createPersonEvents = function(totalPersonCreated) {
 };
 
 // create a set of filler events
-const createFillerEvents = function(countToCreate) {
+const createFillerEvents = countToCreate =>{
 	var events = [];
 	for (var i = 0; i < countToCreate; i++) {
 		events[events.length] = {
 			name: 'FillerEvent' + getRandomInt(0, 9),
 			data: {
-				id: uuid.v4(),
+				id: getRandomEntityId(),
 				category: 'Category' + getRandomInt(0, 4),
 				a: getRandomInt(1, 2000),
 				b: getRandomInt(100, 200)
@@ -258,27 +258,26 @@ const createFillerEvents = function(countToCreate) {
 	return events;
 };
 
-const createPersonInsertValuesResult = function(totalPersonCreated) {
-	var eventColumns = [];
-	var result = createPersonEvents(totalPersonCreated);
+const createPersonEventsResult = totalPersonCreated => {
+	const result = createPersonEvents(totalPersonCreated);
 	initTestingStatsForDbOperation(result.events.length);
-	result.events.forEach(function(event, idx) {
+	const eventColumns = R.forEach((event, idx) => {
 		addTestingStatsToEvent(event, idx);
-		eventColumns[eventColumns.length] = {entityId: getRandomEntityId(), event: event};
-	});
-	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countPersonEvents: result.countPersonEvents,
+		return {entityId: event.data.id, event: event};
+	}, result.events);
+	return {events: eventColumns, countPersonEvents: result.countPersonEvents,
 		countPersonDeletedEvents: result.countPersonDeletedEvents};
 };
 
-const createFillerInsertValuesResult = function() {
+const createFillerEventsResult = () => {
 	var eventColumns = [];
 	const events = createFillerEvents(fillerEventsPerStatement);
 	initTestingStatsForDbOperation(events.length);
-	events.forEach(function(event, idx) {
+	const eventColumns = R.forEach((event, idx) => {
 		addTestingStatsToEvent(event, idx);
-		eventColumns[eventColumns.length] = {entityId: getRandomEntityId(), event: event};
-	});
-	return {insertValues: utils.eventColumnsListToInsertValues(eventColumns), countFillerEvents: events.length};
+		return {entityId: event.data.id, event: event};
+	}, events);
+	return {events: eventColumns, countFillerEvents: events.length};
 };
 
 const createAndInsertEvents = co.wrap(function *(dbClient) {
@@ -290,10 +289,11 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	var totalInsertStatementsCreated = 0;
 	var errorMessage = '';
 	while (totalPersonCreated < numberOfPersonsToCreate) {
-		var personResult = createPersonInsertValuesResult(totalPersonCreated);
-		var fillerResult = createFillerInsertValuesResult();
+		var personResult = createPersonEventsResult(totalPersonCreated);
+		var fillerResult = createFillerEventsResult();
+		var eventsList = [{events: personResult.events}, {events: fillerResult.events}];
+		var insertStatement = utils.createInsertEventsSQLStatement(eventsList);
 		var countEventsCreated = personResult.countPersonEvents + fillerResult.countFillerEvents;
-		var insertStatement = utils.createInsertEventsSQLStatement([personResult.insertValues, fillerResult.insertValues]);
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
 		if (result.rowCount === 1) {
 			var row1 = result.rows[0];
@@ -332,7 +332,7 @@ const main = co.wrap(function *(connectionUrl, connectTimeout) {
 		dbUtils.setDefaultOptions({logger: logger, connectTimeout: connectTimeout});
 		const pooledDbClient = yield dbUtils.createPooledClient(connectionUrl);
 		const dbClientDatabase = pooledDbClient.dbClient.database;
-		const getListener = function(err) {
+		const getListener = err => {
 			logger.error({err: err}, `Error for database ${dbClientDatabase}`);
 			throw err;
 		};
