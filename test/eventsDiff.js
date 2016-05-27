@@ -40,11 +40,11 @@ const logProgress = (delayInSecs) => {
 
 const compareEvents = (events1, events2, diffIds) => {
 	return new Promise((resolve, reject) => {
-		events1.forEach(function (event1, i) {
+		R.forEach(function (event1, i) {
 			if (!R.equals(event1, events2[i])) {
 				diffIds[diffIds.length] = utils.parseInteger(event1.id);
 			}
-		});
+		}, events1);
 		resolve({countEvents: events1.length, thresholdEventId: utils.parseInteger(events1[events1.length - 1].id)});
 	});
 };
