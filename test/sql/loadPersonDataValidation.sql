@@ -44,8 +44,7 @@ get_agg_stats_from_insert_groups AS (
 	FROM
 		(SELECT
 			CASE
-				WHEN (count = eventcount) IS NOT UNKNOWN AND count = eventcount AND (ids = generatedids) IS NOT UNKNOWN AND ids = generatedids
-					AND (eventnums = generatedeventnums) IS NOT UNKNOWN AND eventnums = generatedeventnums
+				WHEN (count = eventcount) IS TRUE AND (ids = generatedids) IS TRUE AND (eventnums = generatedeventnums) IS TRUE
 				THEN true
 				ELSE false
 			END AS insert_group_valid,
@@ -60,14 +59,10 @@ merge_agg_stats_from_all_rows AS (
 	SELECT
 		CASE
 			WHEN
-				(a.minid = 1) IS NOT UNKNOWN
-				AND a.minid = 1
-				AND (oi.ids = ARRAY(SELECT generate_series(a.minid, a.maxid))) IS NOT UNKNOWN
-				AND oi.ids = ARRAY(SELECT generate_series(a.minid, a.maxid))
-				AND (a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)) IS NOT UNKNOWN
-				AND a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)
-				AND (a.count = e.eventcount) IS NOT UNKNOWN
-				AND a.count = e.eventcount
+				(a.minid = 1) IS TRUE
+				AND (oi.ids = ARRAY(SELECT generate_series(a.minid, a.maxid))) IS TRUE
+				AND (a.count = array_length(ARRAY(SELECT generate_series(a.minid, a.maxid) ORDER BY 1), 1)) IS TRUE
+				AND (a.count = e.eventcount) IS TRUE
 			THEN true
 			ELSE false
 		END AS all_rows_valid,
@@ -85,20 +80,13 @@ SELECT
 		THEN 'INVALID (ALL ROWS)'
 		WHEN g.insert_groups_valid = false
 		THEN 'INVALID (INSERT GROUPS)'
-		WHEN (g.minid = 1) IS NOT UNKNOWN
-			AND g.minid = 1
-			AND (a.minid = 1) IS NOT UNKNOWN
-			AND a.minid = 1
-			AND (g.minid = a.minid) IS NOT UNKNOWN
-			AND (g.maxid = a.maxid) IS NOT UNKNOWN
-			AND (g.count = a.count) IS NOT UNKNOWN
-			AND (g.eventcount = a.eventcount) IS NOT UNKNOWN
-			AND g.minid = a.minid
-			AND g.maxid = a.maxid
-			AND g.count = a.count
-			AND g.eventcount = a.eventcount
-			AND g.count = a.eventcount
-			AND (g.count = a.eventcount) IS NOT UNKNOWN
+		WHEN (g.minid = 1) IS TRUE
+			AND (a.minid = 1) IS TRUE
+			AND (g.minid = a.minid) IS TRUE
+			AND (g.maxid = a.maxid) IS TRUE
+			AND (g.count = a.count) IS TRUE
+			AND (g.eventcount = a.eventcount) IS TRUE
+			AND (g.count = a.eventcount) IS TRUE
 		THEN 'VALID'
 		ELSE 'INVALID'
 	END AS events_table_status,
