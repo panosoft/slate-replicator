@@ -75,9 +75,10 @@ if (errors.length > 0) {
 // get absolute name so logs will display absolute path
 const configFilename = path.isAbsolute(program.configFilename) ? program.configFilename : path.resolve('.', program.configFilename);
 
+let config;
 try {
 	logger.info(`${'\n'}Config File Name:  "${configFilename}"${'\n'}`);
-	const config = require(configFilename);
+	config = require(configFilename);
 }
 catch (err) {
 	logger.error({err: err}, `Exception detected processing configuration file:`);
@@ -148,7 +149,7 @@ const initTestingStatsForDbOperation = (eventCount) => {
 
 const addTestingStatsToEvent = (event, idx) => {
 	event.testingStats = R.clone(testingStats);
-	event.testingStats.dbOperationEventNum = idx + 1;
+	event.testingStats.dbOperationEventNum = idx;
 };
 
 const logCounts = (countPersonEventsCreated, countFillerEventsCreated, countEventsCreated, countPersonCreated, countPersonDeleted) => {
@@ -234,7 +235,7 @@ const createPersonEvents = totalPersonCreated => {
 		};
 		countPersonDeletedEvents++;
 	}
-	return {events: events, countPersonEvents: events.length, countPersonDeletedEvents: countPersonDeletedEvents};
+	return {events: events, countPersonDeletedEvents: countPersonDeletedEvents};
 };
 
 // create a set of filler events
@@ -261,23 +262,25 @@ const createFillerEvents = countToCreate =>{
 const createPersonEventsResult = totalPersonCreated => {
 	const result = createPersonEvents(totalPersonCreated);
 	initTestingStatsForDbOperation(result.events.length);
-	const eventColumns = R.forEach((event, idx) => {
+	var idx = 1;
+	result.events = R.forEach((event) => {
 		addTestingStatsToEvent(event, idx);
-		return {entityId: event.data.id, event: event};
+		idx++;
+		return event;
 	}, result.events);
-	return {events: eventColumns, countPersonEvents: result.countPersonEvents,
-		countPersonDeletedEvents: result.countPersonDeletedEvents};
+	return {events: result.events, countPersonDeletedEvents: result.countPersonDeletedEvents};
 };
 
 const createFillerEventsResult = () => {
-	var eventColumns = [];
-	const events = createFillerEvents(fillerEventsPerStatement);
+	var events = createFillerEvents(fillerEventsPerStatement);
 	initTestingStatsForDbOperation(events.length);
-	const eventColumns = R.forEach((event, idx) => {
+	var idx = 1;
+	events = R.forEach((event) => {
 		addTestingStatsToEvent(event, idx);
-		return {entityId: event.data.id, event: event};
+		idx++;
+		return event;
 	}, events);
-	return {events: eventColumns, countFillerEvents: events.length};
+	return {events: events};
 };
 
 const createAndInsertEvents = co.wrap(function *(dbClient) {
@@ -291,9 +294,9 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	while (totalPersonCreated < numberOfPersonsToCreate) {
 		var personResult = createPersonEventsResult(totalPersonCreated);
 		var fillerResult = createFillerEventsResult();
-		var eventsList = [{events: personResult.events}, {events: fillerResult.events}];
-		var insertStatement = utils.createInsertEventsSQLStatement(eventsList);
-		var countEventsCreated = personResult.countPersonEvents + fillerResult.countFillerEvents;
+		var events = R.concat(personResult.events, fillerResult.events);
+		var insertStatement = utils.createInsertEventsSQLStatement(events);
+		var countEventsCreated = personResult.events.length + fillerResult.events.length;
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
 		if (result.rowCount === 1) {
 			var row1 = result.rows[0];
@@ -308,12 +311,12 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 			logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(0, 4000)}...`);
 			throw new Error(errorMessage);
 		}
-		totalPersonEventsCreated += personResult.countPersonEvents;
-		totalFillerEventsCreated += fillerResult.countFillerEvents;
+		totalPersonEventsCreated += personResult.events.length;
+		totalFillerEventsCreated += fillerResult.events.length;
 		totalEventsCreated += countEventsCreated;
 		totalPersonCreated++;
 		totalPersonDeleted += personResult.countPersonDeletedEvents;
-		totalInsertStatementsCreated = totalInsertStatementsCreated + 2;
+		totalInsertStatementsCreated++;
 	}
 	logCounts(totalPersonEventsCreated, totalFillerEventsCreated, totalEventsCreated, totalPersonCreated, totalPersonDeleted);
 });
@@ -328,11 +331,13 @@ const logDbStatus = co.wrap(function *(dbClient) {
 });
 
 const main = co.wrap(function *(connectionUrl, connectTimeout) {
+	let pooledDbClient;
+	let getListener;
 	try {
 		dbUtils.setDefaultOptions({logger: logger, connectTimeout: connectTimeout});
-		const pooledDbClient = yield dbUtils.createPooledClient(connectionUrl);
+		pooledDbClient = yield dbUtils.createPooledClient(connectionUrl);
 		const dbClientDatabase = pooledDbClient.dbClient.database;
-		const getListener = err => {
+		getListener = err => {
 			logger.error({err: err}, `Error for database ${dbClientDatabase}`);
 			throw err;
 		};
