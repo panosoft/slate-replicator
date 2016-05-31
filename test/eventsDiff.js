@@ -265,9 +265,10 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 	// get absolute name so logs will display absolute path
 	const configFilename = path.isAbsolute(program.configFilename) ? program.configFilename : path.resolve('.', program.configFilename);
 
+	let config;
 	try {
 		logger.info(`${'\n'}Config File Name:  "${configFilename}"${'\n'}`);
-		const config = require(configFilename);
+		config = require(configFilename);
 	}
 	catch (err) {
 		logger.error({err: err}, `Exception detected processing configuration file:`);
