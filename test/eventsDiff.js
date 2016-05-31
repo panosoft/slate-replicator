@@ -40,26 +40,31 @@ const logProgress = (delayInSecs) => {
 
 const compareEvents = (events1, events2, diffIds) => {
 	return new Promise((resolve, reject) => {
-		R.forEach(function (event1, i) {
+		var i = 0;
+		R.forEach(function (event1) {
 			if (!R.equals(event1, events2[i])) {
 				diffIds[diffIds.length] = utils.parseInteger(event1.id);
 			}
+			i++;
 		}, events1);
 		resolve({countEvents: events1.length, thresholdEventId: utils.parseInteger(events1[events1.length - 1].id)});
 	});
 };
 
 const getEvents = co.wrap(function *(connectionUrl, selectStatement, maxEventsPerRead) {
+	let dbClient;
+	let eventsStream;
+	let getListener;
 	try {
-		const dbClient = yield dbUtils.createPooledClient(connectionUrl);
+		dbClient = yield dbUtils.createPooledClient(connectionUrl);
 		const dbClientDatabase = dbClient.dbClient.database;
-		const getListener = err => {
+		getListener = err => {
 			_private.logger.error({err: err}, `Pooled Client Error for database ${dbClientDatabase}`);
 			throw err;
 		};
 		// dbClient error handler
 		dbClient.dbClient.on('error', getListener);
-		const eventsStream = dbUtils.createQueryStream(dbClient.dbClient, selectStatement);
+		eventsStream = dbUtils.createQueryStream(dbClient.dbClient, selectStatement);
 		// dbClient events stream error handler
 		eventsStream.on('error', err => {
 			logger.error({err: err}, `Error detected in stream created for database ${dbClientDatabase}`);
