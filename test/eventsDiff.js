@@ -123,7 +123,7 @@ const isEventsTableValid = co.wrap(function *(dbClient) {
 	}
 });
 
-const eventsDiff = co.wrap(function *(events1ConnectionParams, events2ConnectionParams, logger, maxEventsPerRead, maxDiffs, connectTimeout) {
+const eventsDiff = co.wrap(function *(events1ConnectionParams, events2ConnectionParams, logger, maxEventsPerRead, maxDiffs, connectTimeout, validateTables) {
 	try {
 		const diffIds = [];
 		dbUtils.setDefaultOptions({logger: logger, connectTimeout: connectTimeout});
@@ -171,15 +171,17 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 			throw new Error(`events table row counts are different.  Client1 Row Count (${dbClient1Database}):  ` +
 				`${utils.formatNumber(dbClient1RowCount)}  Client2 Row Count (${dbClient2Database}):  ${utils.formatNumber(dbClient2RowCount)}`);
 		}
-		const isTable1Valid = yield isEventsTableValid(dbClient1.dbClient);
-		// events table 1 is not valid
-		if (!isTable1Valid) {
-			throw new Error(`events table in ${dbClient1Database} is not valid`);
-		}
-		const isTable2Valid = yield isEventsTableValid(dbClient2.dbClient);
-		// events table 2 is not valid
-		if (!isTable2Valid) {
-			throw new Error(`events table in ${dbClient2Database} is not valid`);
+		if (validateTables) {
+			const isTable1Valid = yield isEventsTableValid(dbClient1.dbClient);
+			// events table 1 is not valid
+			if (!isTable1Valid) {
+				throw new Error(`events table in ${dbClient1Database} is not valid`);
+			}
+			const isTable2Valid = yield isEventsTableValid(dbClient2.dbClient);
+			// events table 2 is not valid
+			if (!isTable2Valid) {
+				throw new Error(`events table in ${dbClient2Database} is not valid`);
+			}
 		}
 		var result;
 		var thresholdEventId = 0;
@@ -239,6 +241,7 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 (function() {
 	program
 		.option('-c, --config-filename <s>', 'configuration file name')
+		.option('-v, --validate-tables', 'optional parameter.  if specified, validate "testingStats" in each events table.  must have created each event column jsonb object with "testingStats property".  see test/loadPersonData.js.')
 		.option('--dry-run', 'if specified, display run parameters and end program without starting eventsDiff')
 		.parse(process.argv);
 
@@ -258,6 +261,12 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 			logger.info(`Stop program if ${config.maxDiffs} Event Difference(s) is reached`);
 		if (config.connectTimeout)
 			logger.info(`Database Connection Timeout (millisecs):`, config.connectTimeout);
+		if (program.validateTables) {
+			logger.info(`"testingStats" in each database events table will be validated`);
+		}
+		else {
+			logger.info(`"testingStats" in each database events table will NOT be validated`);
+		}
 	};
 
 	const argumentErrors = validateArguments(program);
@@ -326,7 +335,7 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		process.exit(2);
 	}
 
-	eventsDiff(config.events1Params, config.events2Params, logger, config.maxEventsPerRead, config.maxDiffs, config.connectTimeout)
+	eventsDiff(config.events1Params, config.events2Params, logger, config.maxEventsPerRead, config.maxDiffs, config.connectTimeout, program.validateTables)
 	.then(result => {
 		if (result.diffs > 0) {
 			logger.error(`***** Processing Complete with the following number of event differences:  ${result.diffs} *****`);
