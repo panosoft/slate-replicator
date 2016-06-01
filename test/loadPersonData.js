@@ -256,23 +256,10 @@ const createFillerEvents = countToCreate =>{
 			}
 		};
 	}
-	return events;
+	return {events: events};
 };
 
-const createPersonEventsResult = totalPersonCreated => {
-	const result = createPersonEvents(totalPersonCreated);
-	initTestingStatsForDbOperation(result.events.length);
-	var idx = 1;
-	result.events = R.forEach((event) => {
-		addTestingStatsToEvent(event, idx);
-		idx++;
-		return event;
-	}, result.events);
-	return {events: result.events, countPersonDeletedEvents: result.countPersonDeletedEvents};
-};
-
-const createFillerEventsResult = () => {
-	var events = createFillerEvents(fillerEventsPerStatement);
+const addTestingStats = (events) => {
 	initTestingStatsForDbOperation(events.length);
 	var idx = 1;
 	events = R.forEach((event) => {
@@ -280,7 +267,7 @@ const createFillerEventsResult = () => {
 		idx++;
 		return event;
 	}, events);
-	return {events: events};
+	return events;
 };
 
 const createAndInsertEvents = co.wrap(function *(dbClient) {
@@ -292,11 +279,11 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 	var totalInsertStatementsCreated = 0;
 	var errorMessage = '';
 	while (totalPersonCreated < numberOfPersonsToCreate) {
-		var personResult = createPersonEventsResult(totalPersonCreated);
-		var fillerResult = createFillerEventsResult();
-		var events = R.concat(personResult.events, fillerResult.events);
+		var personEvents = createPersonEvents(totalPersonCreated);
+		var fillerEvents = createFillerEvents(fillerEventsPerStatement);
+		var events = addTestingStats(R.concat(personEvents.events, fillerEvents.events));
 		var insertStatement = utils.createInsertEventsSQLStatement(events);
-		var countEventsCreated = personResult.events.length + fillerResult.events.length;
+		var countEventsCreated = personEvents.events.length + fillerEvents.events.length;
 		var result = yield dbUtils.executeSQLStatement(dbClient, insertStatement);
 		if (result.rowCount === 1) {
 			var row1 = result.rows[0];
@@ -311,11 +298,11 @@ const createAndInsertEvents = co.wrap(function *(dbClient) {
 			logger.error(`${errorMessage}  SQL Statement:  ${insertStatement.substr(0, 4000)}...`);
 			throw new Error(errorMessage);
 		}
-		totalPersonEventsCreated += personResult.events.length;
-		totalFillerEventsCreated += fillerResult.events.length;
+		totalPersonEventsCreated += personEvents.events.length;
+		totalFillerEventsCreated += fillerEvents.events.length;
 		totalEventsCreated += countEventsCreated;
 		totalPersonCreated++;
-		totalPersonDeleted += personResult.countPersonDeletedEvents;
+		totalPersonDeleted += personEvents.countPersonDeletedEvents;
 		totalInsertStatementsCreated++;
 	}
 	logCounts(totalPersonEventsCreated, totalFillerEventsCreated, totalEventsCreated, totalPersonCreated, totalPersonDeleted);
