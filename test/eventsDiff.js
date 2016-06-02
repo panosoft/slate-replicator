@@ -343,6 +343,7 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		else {
 			logger.info(`Processing Complete with no event differences`);
 		}
+		process.exit(0);
 	})
 	.catch(err => {
 		logger.error({err: err}, `error in eventDiff`);

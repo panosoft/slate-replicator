@@ -347,6 +347,7 @@ const main = co.wrap(function *(connectionUrl, connectTimeout) {
 main(connectionUrl, config.connectTimeout)
 	.then(() =>  {
 		logger.info(`Processing complete`);
+		process.exit(0);
 	})
 	.catch(err => {
 		logger.error({err: err}, `Exception in loadPersonEvents:`);
