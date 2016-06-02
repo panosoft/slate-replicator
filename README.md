@@ -5,6 +5,8 @@ The purpose of the slate-replicator is to copy a table of immutable events from 
 
 Replication is triggered by events being added to the Event Source database events table.
 
+slate-replicator requires node version 6 or greater.
+
 # Installation
 > npm install @panosoft/slate-replicator
 
