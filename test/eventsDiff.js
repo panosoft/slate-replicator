@@ -53,7 +53,6 @@ const compareEvents = (events1, events2, diffIds) => {
 
 const getEvents = co.wrap(function *(connectionUrl, selectStatement, maxEventsPerRead) {
 	let dbClient;
-	let eventsStream;
 	let getListener;
 	try {
 		dbClient = yield dbUtils.createPooledClient(connectionUrl);
@@ -64,18 +63,15 @@ const getEvents = co.wrap(function *(connectionUrl, selectStatement, maxEventsPe
 		};
 		// dbClient error handler
 		dbClient.dbClient.on('error', getListener);
-		eventsStream = dbUtils.createQueryStream(dbClient.dbClient, selectStatement);
+		const eventStream = dbUtils.createQueryStream(dbClient.dbClient, selectStatement);
 		// dbClient events stream error handler
-		eventsStream.on('error', err => {
+		eventStream.on('error', err => {
 			logger.error({err: err}, `Error detected in stream created for database ${dbClientDatabase}`);
 			throw err;
 		});
-		return yield utils.getEventsFromStream(eventsStream, maxEventsPerRead);
+		return yield utils.getEventsFromStream(eventStream, maxEventsPerRead);
 	}
 	finally {
-		if (eventsStream) {
-			eventsStream.close();
-		}
 		// must remove events listener due to the way the connection pool works
 		if (dbClient && getListener) {
 			dbClient.dbClient.removeListener('error', getListener);
