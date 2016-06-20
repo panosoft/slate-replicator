@@ -16,21 +16,23 @@ const logger = bunyan.createLogger({
 	serializers: bunyan.stdSerializers
 });
 
+const exit = exitCode => setTimeout(() => process.exit(exitCode), 1000);
+
 process.on('uncaughtException', err => {
 	logger.error({err: err}, `Uncaught exception:`);
-	process.exit(1);
+	exit(1);
 });
 process.on('unhandledRejection', (reason, p) => {
 	logger.error("Unhandled Rejection at: Promise ", p, " reason: ", reason);
-	process.exit(1);
+	exit(1);
 });
 process.on('SIGINT', () => {
 	logger.info(`SIGINT received.`);
-	process.exit(0);
+	exit(0);
 });
 process.on('SIGTERM', () => {
 	logger.info(`SIGTERM received.`);
-	process.exit(0);
+	exit(0);
 });
 process.on('exit', () => {
 	const elapsed = Date.now() - startDate.getTime();
@@ -63,7 +65,9 @@ const logConfig = config => {
 	if (config.connectTimeout)
 		logger.info(`Database Connection Timeout (millisecs):`, config.connectTimeout);
 };
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+//  validate configuration
+/////////////////////////////////////////////////////////////////////////////////////
 logger.info('\n### ' + startDate.toISOString() + ' ###\n');
 
 const errors = validateArguments(program);
@@ -127,7 +131,9 @@ if (program.dryRun) {
 	logger.info('dry-run specified, ending program');
 	process.exit(0);
 }
-
+/////////////////////////////////////////////////////////////////////////////////////
+//  to reach this point, configuration must be valid and --dry-run was not specified
+/////////////////////////////////////////////////////////////////////////////////////
 var personIds = {};
 
 const testingStats = {
@@ -347,9 +353,9 @@ const main = co.wrap(function *(connectionUrl, connectTimeout) {
 main(connectionUrl, config.connectTimeout)
 	.then(() =>  {
 		logger.info(`Processing complete`);
-		process.exit(0);
+		exit(0);
 	})
 	.catch(err => {
 		logger.error({err: err}, `Exception in loadPersonEvents:`);
-		process.exit(1);
+		exit(1);
 	});

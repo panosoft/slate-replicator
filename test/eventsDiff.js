@@ -8,28 +8,29 @@ const is = require('is_js');
 const dbUtils = require('@panosoft/slate-db-utils');
 const utils = require('../lib/utils');
 
-var logger = bunyan.createLogger({
+const logger = bunyan.createLogger({
 	name: 'eventsDiff',
 	serializers: bunyan.stdSerializers
 });
 
+const exit = exitCode => setTimeout(() => process.exit(exitCode), 1000);
+
 process.on('uncaughtException', err => {
 	logger.error({err: err}, `Uncaught exception:`);
-	process.exit(1);
+	exit(1);
 });
 process.on('unhandledRejection', (reason, p) => {
 	logger.error("Unhandled Rejection at: Promise ", p, " reason: ", reason);
-	process.exit(1);
+	exit(1);
 });
 process.on('SIGINT', () => {
 	logger.info(`SIGINT received.`);
-	process.exit(0);
+	exit(0);
 });
 process.on('SIGTERM', () => {
 	logger.info(`SIGTERM received.`);
-	process.exit(0);
+	exit(0);
 });
-
 
 const eventsValidationString = fs.readFileSync('test/sql/loadPersonDataValidation.sql', 'utf8');
 
@@ -99,9 +100,9 @@ const processEvents = co.wrap(function *(events1ConnectionUrl, events2Connection
 
 const isEventsTableValid = co.wrap(function *(dbClient) {
 	logger.info(`Checking events table validity for database ${dbClient.database}.  NOTE:  This operation may take several minutes.`);
-	const o = logProgress(60);
+	const intervalObject = logProgress(60);
 	const result = yield dbUtils.executeSQLStatement(dbClient, eventsValidationString);
-	clearInterval(o);
+	clearInterval(intervalObject);
 	if (result.rowCount === 1) {
 		const tableStats = result.rows[0];
 		if (R.test(/^VALID/, tableStats.events_table_status)) {
@@ -264,7 +265,9 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 			logger.info(`"testingStats" in each database events table will NOT be validated`);
 		}
 	};
-
+	/////////////////////////////////////////////////////////////////////////////////////
+	//  validate configuration
+	/////////////////////////////////////////////////////////////////////////////////////
 	const argumentErrors = validateArguments(program);
 
 	if (argumentErrors.length > 0) {
@@ -330,7 +333,9 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		logger.info(`--dry-run specified, ending program`);
 		process.exit(2);
 	}
-
+	/////////////////////////////////////////////////////////////////////////////////////
+	//  to reach this point, configuration must be valid and --dry-run was not specified
+	/////////////////////////////////////////////////////////////////////////////////////
 	eventsDiff(config.events1Params, config.events2Params, logger, config.maxEventsPerRead, config.maxDiffs, config.connectTimeout, program.validateTables)
 	.then(result => {
 		if (result.diffs > 0) {
@@ -339,10 +344,10 @@ const eventsDiff = co.wrap(function *(events1ConnectionParams, events2Connection
 		else {
 			logger.info(`Processing Complete with no event differences`);
 		}
-		process.exit(0);
+		exit(0);
 	})
 	.catch(err => {
-		logger.error({err: err}, `error in eventDiff`);
-		process.exit(2);
+		logger.error({err: err}, `error in eventsDiff`);
+		exit(2);
 	});
 })();
