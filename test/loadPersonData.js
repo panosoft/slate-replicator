@@ -57,6 +57,8 @@ const validateArguments = arguments => {
 		errors = R.append('count-filler is not a positive integer:  ' + arguments.countFiller, errors);
 	if (!utils.isStringPositiveInteger(arguments.countPersonDelete))
 		errors = R.append('count-person-delete is not a positive integer:  ' + arguments.countPersonDelete, errors);
+	if (arguments.args.length > 0)
+		errors = R.append(`Some command arguments exist after processing command options.  There may be command options after " -- " in the command line.  Unprocessed Command Arguments:  ${program.args}`, errors);
 	return errors;
 };
 
