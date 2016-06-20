@@ -16,7 +16,7 @@ var config = {
 	// connection parameters to database for second events table in the comparison
 	events2Params: {
 		host: 'localhost',
-		databaseName: 'sourceDb',
+		databaseName: 'replicationDb',
 		user: 'user1',
 		password: 'password1'
 	}
