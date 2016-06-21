@@ -3,8 +3,9 @@
   "version": "0.1.1",
   "description": "",
   "repository": "panosoft/slate-replicator",
+  "license": "Unlicense",
   "dependencies": {
-    "@panosoft/slate-db-utils": "^0.1.2",
+    "@panosoft/slate-db-utils": "^0.1.6",
     "bunyan": "^1.8.0",
     "co": "^4.6.0",
     "co-read": "^0.1.1",
@@ -20,6 +21,5 @@
     "patch": "npm version patch && git push --follow-tags && npm publish",
     "minor": "npm version minor && git push --follow-tags && npm publish"
   },
-  "author": "",
-  "license": "ISC"
+  "author": ""
 }
