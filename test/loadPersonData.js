@@ -47,13 +47,15 @@ program
 const validateArguments = arguments => {
 	var errors = [];
 	if (!arguments.configFilename || is.not.string(arguments.configFilename))
-		errors = R.append('config-filename is invalid:  ' + arguments.configFilename, errors);
+		errors = R.append('config-filename is invalid:  ' + JSON.stringify(arguments.configFilename), errors);
 	if (!utils.isStringPositiveInteger(arguments.countPerson))
-		errors = R.append('count-person is not a positive integer:  ' + arguments.countPerson, errors);
+		errors = R.append('count-person is not a positive integer:  ' + JSON.stringify(arguments.countPerson), errors);
 	if (!utils.isStringPositiveInteger(arguments.countFiller))
-		errors = R.append('count-filler is not a positive integer:  ' + arguments.countFiller, errors);
+		errors = R.append('count-filler is not a positive integer:  ' + JSON.stringify(arguments.countFiller), errors);
 	if (!utils.isStringPositiveInteger(arguments.countPersonDelete))
-		errors = R.append('count-person-delete is not a positive integer:  ' + arguments.countPersonDelete, errors);
+		errors = R.append('count-person-delete is not a positive integer:  ' + JSON.stringify(arguments.countPersonDelete), errors);
+	if (!(arguments.dryRun === undefined || arguments.dryRun === true))
+		errors = R.append('dry-run is invalid:  ' + JSON.stringify(arguments.dryRun), errors);
 	if (arguments.args.length > 0)
 		errors = R.append(`Some command arguments exist after processing command options.  There may be command options after " -- " in the command line.  Unprocessed Command Arguments:  ${program.args}`, errors);
 	return errors;
