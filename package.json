@@ -7,6 +7,7 @@
   "dependencies": {
     "@panosoft/slate-db-utils": "^0.1.6",
     "bunyan": "^1.8.0",
+    "bunyan-format": "^0.2.1",
     "co": "^4.6.0",
     "co-read": "^0.1.1",
     "commander": "^2.9.0",

@@ -3,13 +3,17 @@ const R = require('ramda');
 var path = require('path');
 const fs = require('fs');
 var bunyan = require('bunyan');
+const bformat = require('bunyan-format');
 var program = require('commander');
 const is = require('is_js');
 const dbUtils = require('@panosoft/slate-db-utils');
 const utils = require('../lib/utils');
 
+const formatOut = bformat({ outputMode: 'long' });
+
 const logger = bunyan.createLogger({
 	name: 'eventsDiff',
+	stream: formatOut,
 	serializers: bunyan.stdSerializers
 });
 

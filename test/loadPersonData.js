@@ -2,6 +2,7 @@ const co = require('co');
 const faker = require('faker');
 const uuid = require('node-uuid');
 const bunyan = require('bunyan');
+const bformat = require('bunyan-format');
 const program = require('commander');
 const R = require('ramda');
 const is = require('is_js');
@@ -11,8 +12,11 @@ const utils = require('../lib/utils');
 
 const startDate = new Date();
 
+const formatOut = bformat({ outputMode: 'long' });
+
 const logger = bunyan.createLogger({
 	name: 'loadPersonData',
+	stream: formatOut,
 	serializers: bunyan.stdSerializers
 });
 
