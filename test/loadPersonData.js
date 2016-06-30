@@ -103,11 +103,11 @@ if (configErrors.length > 0) {
 // db connection url
 const connectionUrl = dbUtils.createConnectionUrl(config.eventSource);
 // total number of insert statements to create
-const numberOfPersonsToCreate = parseInt(program.countPerson, 10);
+const numberOfPersonsToCreate = Number(program.countPerson);
 // total number of filler events to create
-const numberOfFillerEvents = parseInt(program.countFiller, 10);
+const numberOfFillerEvents = Number(program.countFiller);
 // maximum number of person delete events to create
-const numberPersonDeletes = parseInt(program.countPersonDelete, 10);
+const numberPersonDeletes = Number(program.countPersonDelete);
 // number of person events created before person deleted
 var numberPersonEventsToCreateBeforeDelete = Math.ceil(numberOfPersonsToCreate / numberPersonDeletes);
 numberPersonEventsToCreateBeforeDelete = numberPersonEventsToCreateBeforeDelete >= 1 ? numberPersonEventsToCreateBeforeDelete : 1;
