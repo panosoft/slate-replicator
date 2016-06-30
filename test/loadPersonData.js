@@ -20,7 +20,7 @@ const logger = bunyan.createLogger({
 	serializers: bunyan.stdSerializers
 });
 
-const exit = exitCode => setTimeout(() => process.exit(exitCode), 1000);
+const exit = exitCode => setTimeout(_ => process.exit(exitCode), 1000);
 
 process.on('uncaughtException', err => {
 	logger.error({err: err}, `Uncaught exception:`);
@@ -30,18 +30,11 @@ process.on('unhandledRejection', (reason, p) => {
 	logger.error("Unhandled Rejection at: Promise ", p, " reason: ", reason);
 	exit(1);
 });
-process.on('SIGINT', () => {
-	logger.info(`SIGINT received.`);
+const handleSignal = signal => process.on(signal, _ => {
+	logger.info(`${signal} received.`);
 	exit(0);
 });
-process.on('SIGTERM', () => {
-	logger.info(`SIGTERM received.`);
-	exit(0);
-});
-process.on('exit', () => {
-	const elapsed = Date.now() - startDate.getTime();
-	logger.info('\n### Elapsed: ' + elapsed / 1000 + ' ###\n');
-});
+R.forEach(handleSignal, ['SIGINT', 'SIGTERM']);
 
 program
 	.option('-c, --config-filename <s>', 'configuration file name')
