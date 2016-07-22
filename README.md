@@ -126,6 +126,8 @@ The `slate-replicator` uses the `bunyan` logging library to log all exceptions a
 There are two Testing tools provided in the test directory to aid testing the `slate-replicator`:
 #### loadPersonData.js
 This program can be used to test `slate-replicator` by loading the `events` table in the `eventSource` database with realistic looking event data supplied by using the [`faker`](https://www.npmjs.com/package/faker) library.
+
+It also creates validation data in each event that can be optionally checked by the eventsDiff.js program to provide a more thorough validation of `slate-replicator` processing.
 #### eventsDiff.js
 This program validates the data in each `events` table being compared, and then compares data in the `events` table in the `eventSource` database with data in the `events` table in the `replicationDestination` database as specified in the configuration file.
 
