@@ -197,7 +197,7 @@ const createPersonEvents = totalPersonCreated => {
 	events[events.length] = {
 		name: 'PersonCreated',
 		data: {
-			id: personId
+			entity_id: personId
 		},
 		metadata: {
 			initiatorId: getRandomInitiatorId(),
@@ -207,7 +207,7 @@ const createPersonEvents = totalPersonCreated => {
 	events[events.length] = {
 		name: 'PersonNameAdded',
 		data: {
-			id: personId,
+			entity_id: personId,
 			lastName: faker.name.lastName(),
 			firstName: faker.name.firstName(),
 			mi: ''
@@ -220,7 +220,7 @@ const createPersonEvents = totalPersonCreated => {
 	events[events.length] = {
 		name: 'PersonSSNAdded',
 		data: {
-			id: personId,
+			entity_id: personId,
 			ssn : uuid.v4()
 		},
 		metadata: {
@@ -233,7 +233,7 @@ const createPersonEvents = totalPersonCreated => {
 		events[events.length] = {
 			name: 'PersonDeleted',
 			data: {
-				id: getPersonToDelete(totalPersonCreated + 1)
+				entity_id: getPersonToDelete(totalPersonCreated + 1)
 			},
 			metadata: {
 				initiatorId: getRandomInitiatorId(),
@@ -252,7 +252,7 @@ const createFillerEvents = countToCreate =>{
 		events[events.length] = {
 			name: 'FillerEvent' + getRandomInt(0, 9),
 			data: {
-				id: getRandomEntityId(),
+				entity_id: getRandomEntityId(),
 				category: 'Category' + getRandomInt(0, 4),
 				a: getRandomInt(1, 2000),
 				b: getRandomInt(100, 200)

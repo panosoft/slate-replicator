@@ -85,7 +85,7 @@ const getEvents = co.wrap(function *(connectionUrl, selectStatement, maxEventsPe
 });
 
 const processEvents = co.wrap(function *(events1ConnectionUrl, events2ConnectionUrl, maxEventsPerRead, thresholdEventId, diffIds) {
-	const selectStatement = `SELECT id, ts, entity_id, event FROM events
+	const selectStatement = `SELECT id, ts, event FROM events
 							WHERE id > ${thresholdEventId} ORDER BY id LIMIT ${maxEventsPerRead}`;
 	const events1 = yield getEvents(events1ConnectionUrl, selectStatement, maxEventsPerRead);
 	const events2 = yield getEvents(events2ConnectionUrl, selectStatement, maxEventsPerRead);
