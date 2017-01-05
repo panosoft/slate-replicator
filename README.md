@@ -123,7 +123,7 @@ The `slate-replicator` process ends when any exception occurs.  Since the replic
 ### Logging
 The `slate-replicator` uses the `bunyan` logging library to log all exceptions and informational messages. Logging is done to the console as the replicator was designed to be run in a Docker container.
 ### Test Tools
-There are two Testing tools provided in the test directory to aid testing the `slate-replicator`:
+There are two Testing tools, `loadPersonData.js` and `eventsDiff.js`, provided in the test directory to aid testing the `slate-replicator`:
 #### loadPersonData.js
 This program can be used to test `slate-replicator` by loading the `events` table in the `eventSource` database with realistic looking event data supplied by using the [`faker`](https://www.npmjs.com/package/faker) library.
 
@@ -137,5 +137,7 @@ The `loadPersonData` and `eventsDiff` programs can be used to test `slate-replic
 - Run the `loadPersonData` program to create data in the `events` table in the `eventSource` database.  Multiple `loadPersonData` programs can be run at the same time for a more robust test.
 - Run the `slate-replicator` to replicate the test data to an `events` table in a `replicationDestination` database, and stop the `slate-replicator` using `Cntrl-C` when replication is complete.  The `slate-replicator` program can be started before, during, or after the `loadPersonData` program(s) are running.
 - Configure and run the `eventsDiff` program to validate and compare data in the two `events` tables processed by the replicator program.  If the replicator ran properly, then there should be no validation errors or event differences reported by the `eventsDiff` program.
+
+There is an additional Testing tool, `loadPerfTest.js`, provided in the test directory that was written to create data in the `events` table in order to test database and index performance.
 
 Further information regarding how to use the test tools can be found by reading the comments in the test programs.
