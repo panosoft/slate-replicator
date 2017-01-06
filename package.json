@@ -2,6 +2,9 @@
   "name": "@panosoft/slate-replicator",
   "version": "0.1.3",
   "description": "",
+  "bin": {
+    "slate-replicator": "bin/run.js"
+  },
   "repository": "panosoft/slate-replicator",
   "license": "Unlicense",
   "dependencies": {

@@ -5,8 +5,8 @@ var R = require('ramda');
 var bunyan = require('bunyan');
 const bformat = require('bunyan-format');
 const is = require('is_js');
-var replicator = require('./replicator');
-var utils = require('./utils');
+var replicator = require('./../lib/replicator');
+var utils = require('./../lib/utils');
 
 const formatOut = bformat({ outputMode: 'long' });
 
