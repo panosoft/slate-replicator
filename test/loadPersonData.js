@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const co = require('co');
 const faker = require('faker');
 const uuid = require('node-uuid');

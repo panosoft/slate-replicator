@@ -3,7 +3,10 @@
   "version": "0.1.3",
   "description": "",
   "bin": {
-    "slate-replicator": "bin/run.js"
+    "slate-replicator": "bin/run.js",
+    "slate-loadPerfTestData": "test/loadPerfTestData.js",
+    "slate-loadPersonData": "test/loadPersonData.js",
+    "slate-eventsDiff": "test/eventsDiff.js"
   },
   "repository": "panosoft/slate-replicator",
   "license": "Unlicense",

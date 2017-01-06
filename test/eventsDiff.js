@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const co = require('co');
 const R = require('ramda');
 var path = require('path');
