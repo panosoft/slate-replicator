@@ -8,13 +8,13 @@ Replication is triggered by events being added to the Event Source database even
 slate-replicator requires node version 6 or greater.
 
 # Installation
-> npm install @panosoft/slate-replicator
+> npm install -g @panosoft/slate-replicator
 
 # Usage
 
 #### Start slate-replicator
 
-    node run.js [options]
+    slate-replicator [options]
 
   Options:
 
@@ -127,9 +127,13 @@ There are two Testing tools, `loadPersonData.js` and `eventsDiff.js`, provided i
 #### loadPersonData.js
 This program can be used to test `slate-replicator` by loading the `events` table in the `eventSource` database with realistic looking event data supplied by using the [`faker`](https://www.npmjs.com/package/faker) library.
 
+It is started by running `slate-loadPersonData`.
+
 It also creates validation data in each event that can be optionally checked by the eventsDiff.js program to provide a more thorough validation of `slate-replicator` processing.
 #### eventsDiff.js
 This program validates the data in each `events` table being compared, and then compares data in the `events` table in the `eventSource` database with data in the `events` table in the `replicationDestination` database as specified in the configuration file.
+
+It is started by running `slate-eventsDiff`.
 
 This program can be run such that all `events` data row differences can be reported or the program can stop after detecting a configurable number of `events` data row differences.
 
@@ -138,6 +142,8 @@ The `loadPersonData` and `eventsDiff` programs can be used to test `slate-replic
 - Run the `slate-replicator` to replicate the test data to an `events` table in a `replicationDestination` database, and stop the `slate-replicator` using `Cntrl-C` when replication is complete.  The `slate-replicator` program can be started before, during, or after the `loadPersonData` program(s) are running.
 - Configure and run the `eventsDiff` program to validate and compare data in the two `events` tables processed by the replicator program.  If the replicator ran properly, then there should be no validation errors or event differences reported by the `eventsDiff` program.
 
-There is an additional Testing tool, `loadPerfTest.js`, provided in the test directory that was written to create data in the `events` table in order to test database and index performance.
+There is an additional Testing tool, `loadPerfTestData.js`, provided in the test directory that was written to create data in the `events` table in order to test database and index performance.
+
+It is started by running `slate-loadPerfTestData`.
 
 Further information regarding how to use the test tools can be found by reading the comments in the test programs.
