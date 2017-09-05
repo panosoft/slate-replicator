@@ -1,3 +1,6 @@
+# DEPRECATED - Please see [elm-slate/replicator](https://github.com/elm-slate/replicator)
+
+
 # slate-replicator
 Postgresql Event Source Table Replicator For slate
 
